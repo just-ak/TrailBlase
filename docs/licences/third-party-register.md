@@ -5,7 +5,7 @@ licensed GPL-3.0-or-later; every entry here must be inbound-compatible with that
 
 **GENERATED FILE** — regenerate with `npm run licences`.
 
-Generated 2026-11-05 from the installed dependency tree
+Generated 2026-11-06 from the installed dependency tree
 on Node v26.13.0. Packages examined: **355**. Incompatibilities: **0**.
 
 ## Licence distribution

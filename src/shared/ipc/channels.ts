@@ -35,6 +35,41 @@ export const CHANNELS = {
     createTo: 'backup:createTo',
     restore: 'backup:restore',
   },
+  routes: {
+    listForTrip: 'routes:listForTrip',
+    listAll: 'routes:listAll',
+    get: 'routes:get',
+    create: 'routes:create',
+    update: 'routes:update',
+    setGeometry: 'routes:setGeometry',
+    reverse: 'routes:reverse',
+    duplicate: 'routes:duplicate',
+    move: 'routes:move',
+    delete: 'routes:delete',
+  },
+  waypoints: {
+    listForTrip: 'waypoints:listForTrip',
+    listAll: 'waypoints:listAll',
+    get: 'waypoints:get',
+    create: 'waypoints:create',
+    update: 'waypoints:update',
+    move: 'waypoints:move',
+    duplicate: 'waypoints:duplicate',
+    moveToTrip: 'waypoints:moveToTrip',
+    delete: 'waypoints:delete',
+    search: 'waypoints:search',
+    groups: 'waypoints:groups',
+    createGroup: 'waypoints:createGroup',
+  },
+  geometry: {
+    forTrip: 'geometry:forTrip',
+  },
+  undo: {
+    state: 'undo:state',
+    undo: 'undo:undo',
+    redo: 'undo:redo',
+    clear: 'undo:clear',
+  },
   app: {
     info: 'app:info',
     licences: 'app:licences',
@@ -47,6 +82,7 @@ export const EVENTS = {
   menuAction: 'event:menuAction',
   themeChanged: 'event:themeChanged',
   libraryChanged: 'event:libraryChanged',
+  undoStateChanged: 'event:undoStateChanged',
 } as const;
 
 /**
@@ -57,6 +93,12 @@ export const EVENTS = {
 export const MENU_ACTIONS = [
   'trip:new',
   'folder:new',
+  'route:new',
+  'waypoint:new',
+  'edit:undo',
+  'edit:redo',
+  'map:fitRoute',
+  'map:returnToSelection',
   'trip:rename',
   'trip:duplicate',
   'trip:delete',

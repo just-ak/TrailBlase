@@ -7,6 +7,7 @@ import type {
   TripSortKey,
   TripWithCounts,
 } from '@shared/domain/types';
+import type { WaypointWithTrip } from '@shared/ipc/api';
 import { api, call, callOr } from '../lib/client';
 
 /**
@@ -30,6 +31,7 @@ interface LibraryState {
 
   search: string;
   searchResults: TripWithCounts[] | null;
+  waypointResults: WaypointWithTrip[] | null;
 
   hydrate(settings: AppSettings): void;
   refresh(): Promise<void>;
@@ -67,6 +69,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   search: '',
   searchResults: null,
+  waypointResults: null,
 
   hydrate: (settings) => {
     set({
@@ -129,12 +132,17 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ search: query });
     const trimmed = query.trim();
     if (trimmed.length === 0) {
-      set({ searchResults: null });
+      set({ searchResults: null, waypointResults: null });
       return;
     }
     // Guard against an earlier request resolving after a later one.
     const seq = ++searchSeq;
-    const results = await callOr(api().trips.search({ query: trimmed }), []);
-    if (seq === searchSeq) set({ searchResults: results });
+    const [trips, waypoints] = await Promise.all([
+      callOr(api().trips.search({ query: trimmed }), []),
+      callOr(api().waypoints.search({ query: trimmed }), []),
+    ]);
+    if (seq === searchSeq) {
+      set({ searchResults: trips, waypointResults: waypoints });
+    }
   },
 }));

@@ -303,7 +303,10 @@ describe('tripService', () => {
     expect(tripService.search(db, '')).toEqual([]);
   });
 
-  it('reports zero child counts in Phase 1', () => {
+  it('reports zero child counts for an empty trip', () => {
+    // Non-zero counts are covered in routesWaypoints.test.ts. Asserting only
+    // the empty case here would pass even if the count query were broken —
+    // which it was, until the correlated subquery was fixed.
     const trip = newTrip('T');
     expect(tripService.get(db, trip.id).routeCount).toBe(0);
     expect(tripService.get(db, trip.id).trackCount).toBe(0);
@@ -392,10 +395,14 @@ describe('libraryService.tree', () => {
   it('marks later-phase views unavailable rather than showing empty branches', () => {
     const root = libraryService.tree(db, { includeArchived: false });
     const byId = new Map(root.children.map((c) => [c.viewId, c]));
+
+    // Implemented as of Phase 2.
     expect(byId.get('trips')?.available).toBe(true);
-    expect(byId.get('routes')?.available).toBe(false);
+    expect(byId.get('routes')?.available).toBe(true);
+    expect(byId.get('waypoints')?.available).toBe(true);
+
+    // Still to come: tracks and imports are Phase 3.
     expect(byId.get('tracks')?.available).toBe(false);
-    expect(byId.get('waypoints')?.available).toBe(false);
     expect(byId.get('imported')?.available).toBe(false);
     expect(byId.get('recent')?.available).toBe(false);
   });

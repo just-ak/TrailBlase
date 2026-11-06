@@ -7,7 +7,7 @@ import type {
   TripWithCounts,
 } from '@shared/domain/types';
 import type { Db } from '../client';
-import { routes, tracks, trips, waypoints } from '../schema';
+import { trips } from '../schema';
 
 export function rowToTrip(row: typeof trips.$inferSelect): Trip {
   return {
@@ -22,10 +22,20 @@ export function rowToTrip(row: typeof trips.$inferSelect): Trip {
   };
 }
 
+/**
+ * Correlated child counts.
+ *
+ * Written with explicit table aliases rather than interpolated drizzle column
+ * objects. Interpolating `${waypoints.tripId}` renders an *unqualified*
+ * `"trip_id"`, which inside the subquery resolves against `waypoints` itself —
+ * producing `where "trip_id" = "id"`, a comparison of a waypoint's trip to its
+ * own id, which is never true and silently yields 0. Aliasing removes the
+ * ambiguity entirely.
+ */
 const countsSelect = {
-  routeCount: sql<number>`(select count(*) from ${routes} where ${routes.tripId} = ${trips.id})`,
-  trackCount: sql<number>`(select count(*) from ${tracks} where ${tracks.tripId} = ${trips.id})`,
-  waypointCount: sql<number>`(select count(*) from ${waypoints} where ${waypoints.tripId} = ${trips.id})`,
+  routeCount: sql<number>`(select count(*) from routes r where r.trip_id = trips.id)`,
+  trackCount: sql<number>`(select count(*) from tracks tr where tr.trip_id = trips.id)`,
+  waypointCount: sql<number>`(select count(*) from waypoints w where w.trip_id = trips.id)`,
 };
 
 function orderFor(key: TripSortKey, direction: SortDirection) {

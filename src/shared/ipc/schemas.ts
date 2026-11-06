@@ -210,3 +210,146 @@ export type FolderMoveRequest = z.infer<typeof folderMoveRequest>;
 export type SettingsSetRequest = z.infer<typeof settingsSetRequest>;
 export type BackupRestoreRequest = z.infer<typeof backupRestoreRequest>;
 export type OpenExternalRequest = z.infer<typeof openExternalRequest>;
+
+// ------------------------------------------------- Phase 2: routes, waypoints
+
+export const elevationSchema = z
+  .number()
+  .finite()
+  // Dead Sea shore to above the troposphere: wide enough for any real datum,
+  // narrow enough to catch a unit mix-up or a parsing error.
+  .min(-500)
+  .max(12_000)
+  .nullable();
+
+export const routePointSchema = z
+  .object({
+    lat: latSchema,
+    lon: lonSchema,
+    ele: elevationSchema.default(null),
+    name: z.string().max(200).nullable().default(null),
+    symbol: z.string().max(64).nullable().default(null),
+    notes: z.string().max(10_000).nullable().default(null),
+  })
+  .strict();
+
+/**
+ * A route's complete geometry.
+ *
+ * Capped at 10,000 points: a human-placed route is tens to low hundreds, and
+ * the cap keeps a single undo entry bounded. Recorded tracks, which are far
+ * larger, use a different storage path entirely (ADR 0003).
+ */
+export const routePointsSchema = z.array(routePointSchema).max(10_000);
+
+export const routeColourSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, 'Expected a hex colour such as #2563eb')
+  .nullable();
+
+export const routeListForTripRequest = z.object({ tripId: idSchema }).strict();
+export const routeGetRequest = z.object({ id: idSchema }).strict();
+
+export const routeCreateRequest = z
+  .object({
+    tripId: idSchema,
+    name: nameSchema,
+    colour: routeColourSchema.default(null),
+    points: routePointsSchema.default([]),
+  })
+  .strict();
+
+export const routeUpdateRequest = z
+  .object({
+    id: idSchema,
+    name: nameSchema.optional(),
+    colour: routeColourSchema.optional(),
+  })
+  .strict()
+  .refine((v) => v.name !== undefined || v.colour !== undefined, {
+    message: 'At least one field must be provided',
+  });
+
+export const routeSetGeometryRequest = z
+  .object({ id: idSchema, points: routePointsSchema })
+  .strict();
+
+export const routeReverseRequest = z.object({ id: idSchema }).strict();
+export const routeDuplicateRequest = z.object({ id: idSchema }).strict();
+export const routeDeleteRequest = z.object({ id: idSchema }).strict();
+
+export const routeMoveRequest = z
+  .object({ id: idSchema, tripId: idSchema })
+  .strict();
+
+// ------------------------------------------------------------- waypoints
+
+export const waypointListForTripRequest = z
+  .object({ tripId: idSchema })
+  .strict();
+
+export const waypointGetRequest = z.object({ id: idSchema }).strict();
+
+export const waypointCreateRequest = z
+  .object({
+    tripId: idSchema,
+    name: nameSchema,
+    lat: latSchema,
+    lon: lonSchema,
+    eleM: elevationSchema.default(null),
+    description: optionalTextSchema.default(null),
+    symbol: z.string().max(64).default('pin'),
+    notes: optionalTextSchema.default(null),
+    groupId: idSchema.nullable().default(null),
+  })
+  .strict();
+
+export const waypointUpdateRequest = z
+  .object({
+    id: idSchema,
+    name: nameSchema.optional(),
+    lat: latSchema.optional(),
+    lon: lonSchema.optional(),
+    eleM: elevationSchema.optional(),
+    description: optionalTextSchema.optional(),
+    symbol: z.string().max(64).optional(),
+    notes: optionalTextSchema.optional(),
+    groupId: idSchema.nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (v) => Object.keys(v).some((k) => k !== 'id'),
+    { message: 'At least one field must be provided' },
+  );
+
+/** Dragging a marker: coordinates only, so the undo label can say "Move". */
+export const waypointMoveRequest = z
+  .object({ id: idSchema, lat: latSchema, lon: lonSchema })
+  .strict();
+
+export const waypointDeleteRequest = z.object({ id: idSchema }).strict();
+export const waypointDuplicateRequest = z.object({ id: idSchema }).strict();
+
+export const waypointMoveToTripRequest = z
+  .object({ id: idSchema, tripId: idSchema })
+  .strict();
+
+export const waypointSearchRequest = z
+  .object({ query: z.string().trim().max(200) })
+  .strict();
+
+export const waypointGroupsRequest = z.object({ tripId: idSchema }).strict();
+
+export const waypointCreateGroupRequest = z
+  .object({ tripId: idSchema, name: nameSchema })
+  .strict();
+
+// -------------------------------------------------------------- geometry
+
+export const geometryForTripRequest = z.object({ tripId: idSchema }).strict();
+
+export type RoutePointInput = z.input<typeof routePointSchema>;
+export type RouteCreateRequest = z.infer<typeof routeCreateRequest>;
+export type RouteSetGeometryRequest = z.infer<typeof routeSetGeometryRequest>;
+export type WaypointCreateRequest = z.infer<typeof waypointCreateRequest>;
+export type WaypointUpdateRequest = z.infer<typeof waypointUpdateRequest>;

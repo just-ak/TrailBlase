@@ -64,7 +64,13 @@ export interface ObjectRef {
  * reports whether the feature behind it exists yet, so the tree can say "later
  * phase" instead of rendering a misleading empty branch.
  */
-export type TreeNodeKind = 'root' | 'folder' | 'trip' | 'view';
+export type TreeNodeKind =
+  | 'root'
+  | 'folder'
+  | 'trip'
+  | 'view'
+  | 'route'
+  | 'waypoint';
 
 export type ViewId =
   | 'trips'
@@ -75,7 +81,16 @@ export type ViewId =
   | 'recent';
 
 export interface TreeNode {
+  /**
+   * Unique **position** in the tree, used for React keys and expansion state.
+   *
+   * Deliberately distinct from `ref`: the same route appears both under its
+   * trip and in the cross-trip Routes view, so object identity cannot double as
+   * node identity without producing duplicate keys.
+   */
   id: string;
+  /** The object this row represents, for selection. Absent for views/root. */
+  ref?: ObjectRef;
   kind: TreeNodeKind;
   name: string;
   /** Present for `view` nodes only. */
@@ -84,6 +99,8 @@ export interface TreeNode {
   available?: boolean;
   /** Present for `trip` nodes. */
   status?: TripStatus;
+  /** Secondary text, such as a route's distance or an owning trip's name. */
+  detail?: string;
   children: TreeNode[];
 }
 
@@ -134,3 +151,94 @@ export interface AppSettings {
 }
 
 export type SettingsKey = keyof AppSettings;
+
+// ------------------------------------------------- Phase 2: routes, waypoints
+
+/** Source of an object's geometry. Imports are never modified implicitly. */
+export type GeometrySource = 'user' | 'import';
+
+export interface RoutePoint {
+  lat: number;
+  lon: number;
+  /** Metres, or null when the source carried no elevation. */
+  ele: number | null;
+  name: string | null;
+  symbol: string | null;
+  notes: string | null;
+}
+
+/**
+ * Derived statistics. Every field is nullable because "unknown" and "zero" are
+ * different facts: a route with no elevation data has `elevGainM === null`,
+ * while a genuinely flat route with elevation data has `0`.
+ */
+export interface RouteStats {
+  pointCount: number;
+  distanceM: number | null;
+  elevGainM: number | null;
+  elevLossM: number | null;
+  elevMinM: number | null;
+  elevMaxM: number | null;
+}
+
+export interface Route extends RouteStats {
+  id: Id;
+  tripId: Id;
+  name: string;
+  colour: string | null;
+  source: GeometrySource;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface RouteWithPoints extends Route {
+  points: RoutePoint[];
+}
+
+export interface WaypointGroup {
+  id: Id;
+  tripId: Id;
+  name: string;
+  createdAt: Timestamp;
+}
+
+export interface Waypoint {
+  id: Id;
+  tripId: Id;
+  groupId: Id | null;
+  name: string;
+  lat: number;
+  lon: number;
+  eleM: number | null;
+  description: string | null;
+  symbol: string | null;
+  notes: string | null;
+  source: GeometrySource;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/** Bounding box in the form the map needs to fit a view. */
+export interface Bounds {
+  minLat: number;
+  minLon: number;
+  maxLat: number;
+  maxLon: number;
+}
+
+/** Everything the map needs to render one trip. */
+export interface TripGeometry {
+  tripId: Id;
+  routes: RouteWithPoints[];
+  waypoints: Waypoint[];
+  bounds: Bounds | null;
+}
+
+/** State of the undo history, mirrored into the Edit menu. */
+export interface UndoState {
+  canUndo: boolean;
+  canRedo: boolean;
+  /** Describes the action, for the menu label. Null when unavailable. */
+  undoLabel: string | null;
+  redoLabel: string | null;
+}

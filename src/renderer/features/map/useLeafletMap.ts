@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import type { MapPosition } from '@shared/domain/types';
 import { getMapProvider } from '@shared/map/MapProvider';
+import { setMapInstance } from './mapInstance';
 
 /**
  * Owns the Leaflet map instance.
@@ -70,6 +71,8 @@ export function useLeafletMap(options: Options): LeafletHandle {
     });
 
     mapRef.current = map;
+    // Publish to the external store so layer hooks can attach in their effects.
+    setMapInstance(map);
 
     const persist = (): void => {
       const centre = map.getCenter();
@@ -91,6 +94,7 @@ export function useLeafletMap(options: Options): LeafletHandle {
 
     return () => {
       observer.disconnect();
+      setMapInstance(null);
       map.off();
       map.remove();
       mapRef.current = null;

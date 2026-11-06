@@ -1,4 +1,5 @@
 import { app, Menu, type MenuItemConstructorOptions } from 'electron';
+import type { UndoState } from '@shared/domain/types';
 import { EVENTS, type MenuAction } from '@shared/ipc/channels';
 import { openExternal } from '../security/navigation';
 import { sendToRenderer } from '../window';
@@ -35,7 +36,21 @@ function later(
   };
 }
 
-export function buildApplicationMenu(): Menu {
+const NO_UNDO: UndoState = {
+  canUndo: false,
+  canRedo: false,
+  undoLabel: null,
+  redoLabel: null,
+};
+
+/**
+ * Builds the menu for a given undo state.
+ *
+ * Electron menus are immutable once built, so reflecting "Undo move waypoint"
+ * means rebuilding. That is cheap and is the conventional approach; the
+ * alternative is a static "Undo" that lies about what it will do.
+ */
+export function buildApplicationMenu(undo: UndoState = NO_UNDO): Menu {
   const template: MenuItemConstructorOptions[] = [
     {
       label: app.name,
@@ -91,11 +106,22 @@ export function buildApplicationMenu(): Menu {
     {
       label: 'Edit',
       submenu: [
-        // The history stack is Phase 2. Phase 1 routes every mutation through
-        // a service that reports its inverse, which is what makes that
-        // possible without touching call sites.
-        later('Undo', 'Phase 2', 'Cmd+Z'),
-        later('Redo', 'Phase 2', 'Shift+Cmd+Z'),
+        {
+          // Labelled with what it will reverse, so the menu is specific
+          // rather than just "Undo".
+          label:
+            undo.undoLabel === null ? 'Undo' : `Undo ${undo.undoLabel}`,
+          accelerator: 'Cmd+Z',
+          enabled: undo.canUndo,
+          click: dispatch('edit:undo'),
+        },
+        {
+          label:
+            undo.redoLabel === null ? 'Redo' : `Redo ${undo.redoLabel}`,
+          accelerator: 'Shift+Cmd+Z',
+          enabled: undo.canRedo,
+          click: dispatch('edit:redo'),
+        },
         { type: 'separator' },
         { role: 'cut' },
         { role: 'copy' },
@@ -141,9 +167,19 @@ export function buildApplicationMenu(): Menu {
         {
           label: 'Fit Trip to Screen',
           accelerator: 'Cmd+0',
-          // Enabled but inert until a trip has geometry to fit. The renderer
-          // reports when nothing is fittable rather than the menu pretending.
+          // The renderer reports when there is nothing fittable rather than
+          // the menu pretending it did something.
           click: dispatch('map:fitTrip'),
+        },
+        {
+          label: 'Fit Route to Screen',
+          accelerator: 'Alt+Cmd+0',
+          click: dispatch('map:fitRoute'),
+        },
+        {
+          label: 'Return to Selection',
+          accelerator: 'Cmd+J',
+          click: dispatch('map:returnToSelection'),
         },
         { type: 'separator' },
         { role: 'togglefullscreen' },
@@ -153,9 +189,17 @@ export function buildApplicationMenu(): Menu {
     {
       label: 'Trip',
       submenu: [
-        later('New Route', 'Phase 2'),
+        {
+          label: 'New Route',
+          accelerator: 'Cmd+R',
+          click: dispatch('route:new'),
+        },
         later('New Track', 'Phase 3'),
-        later('New Waypoint', 'Phase 2'),
+        {
+          label: 'New Waypoint',
+          accelerator: 'Cmd+Shift+W',
+          click: dispatch('waypoint:new'),
+        },
         { type: 'separator' },
         { label: 'Rename Trip…', click: dispatch('trip:rename') },
         { label: 'Duplicate Trip', click: dispatch('trip:duplicate') },
@@ -199,6 +243,6 @@ export function buildApplicationMenu(): Menu {
   return Menu.buildFromTemplate(template);
 }
 
-export function installApplicationMenu(): void {
-  Menu.setApplicationMenu(buildApplicationMenu());
+export function installApplicationMenu(undo: UndoState = NO_UNDO): void {
+  Menu.setApplicationMenu(buildApplicationMenu(undo));
 }

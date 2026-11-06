@@ -5,12 +5,13 @@ Electron with React and TypeScript. Plan, organise, view and edit outdoor trips,
 routes, tracks and waypoints, with OpenStreetMap as the initial map provider and
 no Garmin hardware or cloud account required.
 
-**Status: Phase 1 complete and verified.** The app launches, renders an
-OpenStreetMap map, and manages trips and folders that persist across restarts.
-Phase 2 (routes and waypoints) is next.
+**Status: Phases 1 and 2 complete and verified.** The app launches, renders an
+OpenStreetMap map, and manages trips, folders, routes and waypoints that persist
+across restarts. Routes are drawn and edited directly on the map, with undo and
+redo over every edit. Phase 3 (tracks and import/export) is next.
 
-All four Phase 1 acceptance criteria are verified against the packaged DMG
-build, not just the development output: 110 unit tests and 21 end-to-end tests
+Every acceptance criterion for both phases is verified against the packaged DMG
+build, not just the development output: 215 unit tests and 34 end-to-end tests
 pass, with a clean typecheck and no lint errors.
 
 ```sh
@@ -50,7 +51,9 @@ good set rather than an aspiration.
 1. **Foundation** — _complete._ Electron shell, security baseline, SQLite with
    migrations, three-panel layout, trip library, OpenStreetMap view, menus,
    settings, backup and restore
-2. **Routes and waypoints** — drawing, editing, statistics, undo history
+2. **Routes and waypoints** — _complete._ Draw routes on the map, drag/insert/
+   delete vertices, waypoints with a Garmin-aligned symbol set, derived
+   statistics, and an undo history over every edit
 3. **Tracks and import/export** — GPX, KML/KMZ, TCX, FIT, CSV, JSON, with an
    import report that never silently discards data
 4. **Advanced mapping** — additional providers, routing abstraction, elevation

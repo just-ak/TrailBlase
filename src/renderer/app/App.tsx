@@ -1,14 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Toast } from '../components/Toast';
-import { AboutDialog } from '../features/about/AboutDialog';
-import { RestoreDialog } from '../features/backup/RestoreDialog';
-import { ConfirmDeleteDialog } from '../features/library/ConfirmDeleteDialog';
-import { SettingsDialog } from '../features/settings/SettingsDialog';
-import { api, callOr, describeError } from '../lib/client';
-import { useLibraryStore } from '../stores/libraryStore';
-import { useSettingsStore } from '../stores/settingsStore';
-import { useUiStore } from '../stores/uiStore';
-import { Layout } from './Layout';
+import { useEffect, useState, type ReactNode } from "react";
+import { Toast } from "../components/Toast";
+import { AboutDialog } from "../features/about/AboutDialog";
+import { RestoreDialog } from "../features/backup/RestoreDialog";
+import { ConfirmDeleteDialog } from "../features/library/ConfirmDeleteDialog";
+import { SettingsDialog } from "../features/settings/SettingsDialog";
+import * as actions from "../lib/actions";
+import { api, callOr, describeError } from "../lib/client";
+import { useLibraryStore } from "../stores/libraryStore";
+import { useSettingsStore } from "../stores/settingsStore";
+import { useUiStore } from "../stores/uiStore";
+import { useUndoStore } from "../stores/undoStore";
+import { Layout } from "./Layout";
 
 /**
  * Root component: hydration, theme, global menu wiring and dialog hosting.
@@ -33,7 +35,7 @@ export function App(): ReactNode {
       try {
         const settings = await useSettingsStore.getState().load();
         const prefersDark = window.matchMedia(
-          '(prefers-color-scheme: dark)',
+          "(prefers-color-scheme: dark)",
         ).matches;
         useUiStore.getState().hydrate(settings, prefersDark);
         useLibraryStore.getState().hydrate(settings);
@@ -46,8 +48,8 @@ export function App(): ReactNode {
 
   // --- theme: a class on <html> drives the Tailwind dark variant
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark);
-    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
   }, [isDark]);
 
   // The main process is authoritative for system theme, since nativeTheme sees
@@ -56,42 +58,57 @@ export function App(): ReactNode {
     return api().events.onThemeChanged(setSystemPrefersDark);
   }, [setSystemPrefersDark]);
 
+  // The undo stack lives in the main process; this mirror drives the Edit
+  // menu's enabled state and labels.
+  useEffect(() => {
+    void useUndoStore.getState().load();
+    return api().events.onUndoStateChanged((state) => {
+      useUndoStore.getState().apply(state);
+    });
+  }, []);
+
   // --- native menu actions that belong to the shell rather than a feature
   useEffect(() => {
     return api().events.onMenuAction((action) => {
       const ui = useUiStore.getState();
       switch (action) {
-        case 'panel:toggleLibrary':
+        case "panel:toggleLibrary":
           ui.toggleLibrary();
           break;
-        case 'panel:togglePanelProperties':
+        case "panel:togglePanelProperties":
           ui.toggleProperties();
           break;
-        case 'settings:open':
-          openDialog({ kind: 'settings' });
+        case "settings:open":
+          openDialog({ kind: "settings" });
           break;
-        case 'about:open':
-          openDialog({ kind: 'about' });
+        case "about:open":
+          openDialog({ kind: "about" });
           break;
-        case 'backup:restore':
-          openDialog({ kind: 'restore' });
+        case "backup:restore":
+          openDialog({ kind: "restore" });
           break;
-        case 'backup:create':
+        case "edit:undo":
+          void actions.undo();
+          break;
+        case "edit:redo":
+          void actions.redo();
+          break;
+        case "backup:create":
           void (async () => {
             const entry = await callOr(api().backup.create(), null);
             showToast(
               entry === null
-                ? 'The backup could not be created.'
-                : 'Backup created.',
-              entry === null ? 'error' : 'info',
+                ? "The backup could not be created."
+                : "Backup created.",
+              entry === null ? "error" : "info",
             );
           })();
           break;
-        case 'export:copy':
+        case "export:copy":
           void (async () => {
             const result = await callOr(api().backup.createTo(), null);
             if (result !== null && !result.cancelled) {
-              showToast('Copy saved.');
+              showToast("Copy saved.");
             }
           })();
           break;
@@ -129,10 +146,10 @@ export function App(): ReactNode {
     <>
       <Layout />
 
-      {dialog.kind === 'settings' && <SettingsDialog />}
-      {dialog.kind === 'about' && <AboutDialog />}
-      {dialog.kind === 'restore' && <RestoreDialog />}
-      {dialog.kind === 'confirmDelete' && (
+      {dialog.kind === "settings" && <SettingsDialog />}
+      {dialog.kind === "about" && <AboutDialog />}
+      {dialog.kind === "restore" && <RestoreDialog />}
+      {dialog.kind === "confirmDelete" && (
         <ConfirmDeleteDialog target={dialog.target} counts={dialog.counts} />
       )}
 

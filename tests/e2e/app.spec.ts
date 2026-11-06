@@ -83,9 +83,13 @@ test.describe('security posture', () => {
       'backup',
       'events',
       'folders',
+      'geometry',
       'library',
+      'routes',
       'settings',
       'trips',
+      'undo',
+      'waypoints',
     ]);
     // A passthrough would make the restricted surface decorative.
     expect(api.hasInvoke).toBe(false);
@@ -212,9 +216,18 @@ test.describe('library tree', () => {
   });
 
   test('marks later-phase branches rather than showing them as broken', async () => {
+    // Tracks and imports arrive in Phase 3, so those branches say so.
     await expect(
-      harness.page.getByRole('treeitem', { name: /^Routes/ }),
+      harness.page.getByRole('treeitem', { name: 'Tracks', exact: true }),
     ).toContainText('later phase');
+    await expect(
+      harness.page.getByRole('treeitem', { name: 'Imported Data', exact: true }),
+    ).toContainText('later phase');
+
+    // Routes and Waypoints are implemented as of Phase 2, so they must not.
+    await expect(
+      harness.page.getByRole('treeitem', { name: 'Routes', exact: true }),
+    ).not.toContainText('later phase');
   });
 });
 

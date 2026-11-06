@@ -10,17 +10,17 @@ instead.
 | Document                                                         | Purpose                                                                      |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | [`spec-review.md`](spec-review.md)                               | Findings against the source specification, plus open questions for the owner |
-| [`phase-1-foundation/`](phase-1-foundation/)                     | Requirements, design and tasks. **Ready to implement.**                      |
-| [`phase-2-routes-waypoints/`](phase-2-routes-waypoints/)         | Requirements only. Blocked on Phase 1.                                       |
-| [`phase-3-tracks-import-export/`](phase-3-tracks-import-export/) | Requirements only. Blocked on Phase 2.                                       |
+| [`phase-1-foundation/`](phase-1-foundation/)                     | Requirements, design and tasks. **Complete.**                      |
+| [`phase-2-routes-waypoints/`](phase-2-routes-waypoints/)         | Requirements, design and tasks. **Complete.**                                       |
+| [`phase-3-tracks-import-export/`](phase-3-tracks-import-export/) | Requirements only. Ready to design.                                                           |
 | [`phase-4-advanced-mapping/`](phase-4-advanced-mapping/)         | Requirements only. Blocked on Phase 3.                                       |
 | [`phase-5-garmin-compatibility/`](phase-5-garmin-compatibility/) | Requirements only. Mostly investigation deliverables.                        |
 
-Only Phase 1 has a design and task breakdown. That is deliberate: section 20 of
-the source specification requires that later phases are not designed or
-implemented until Phase 1 is built and tested. Designing Phase 3's import
-subsystem now would be guessing at interfaces that Phase 1 and 2 have not yet
-settled.
+Only the built phases have a design and task breakdown. That is deliberate:
+section 20 of the source specification requires that later phases are not
+designed or implemented until the previous one is built and tested. Designing
+Phase 3's import subsystem before Phase 2 existed would have meant guessing at
+interfaces that had not yet settled.
 
 ## Supporting documents
 

@@ -56,6 +56,8 @@ function Icon({ node }: { node: TreeNode }): ReactNode {
   if (node.kind === "folder") return <span aria-hidden="true">📁</span>;
   if (node.kind === "trip") return <span aria-hidden="true">🗺️</span>;
   if (node.kind === "root") return <span aria-hidden="true">📚</span>;
+  if (node.kind === "route") return <span aria-hidden="true">〰️</span>;
+  if (node.kind === "waypoint") return <span aria-hidden="true">📍</span>;
   return <span aria-hidden="true">🔖</span>;
 }
 
@@ -155,6 +157,13 @@ export function TreeRow({
       ) : (
         <span className="min-w-0 flex-1 truncate">
           {node.name}
+          {node.detail !== undefined && (
+            <span
+              className={`ml-1.5 text-[11px] ${selected ? "text-white/70" : "text-[var(--color-text-muted)]"}`}
+            >
+              {node.detail}
+            </span>
+          )}
           {archived && (
             <span
               className={`ml-1.5 text-[11px] ${selected ? "text-white/70" : "text-[var(--color-text-muted)]"}`}

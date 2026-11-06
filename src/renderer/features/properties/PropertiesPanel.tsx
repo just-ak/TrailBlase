@@ -1,10 +1,15 @@
 import { useState, type ReactNode } from "react";
 import { formatTimestamp } from "@shared/geo/units";
 import type { Folder, TripWithCounts } from "@shared/domain/types";
+import { Button } from "../../components/Button";
 import { api, call, describeError } from "../../lib/client";
+import * as actions from "../../lib/actions";
 import { useLibraryStore } from "../../stores/libraryStore";
 import { useSelectionStore } from "../../stores/selectionStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useUiStore } from "../../stores/uiStore";
+import { RouteProperties } from "./RouteProperties";
+import { WaypointProperties } from "./WaypointProperties";
 
 /**
  * The right panel.
@@ -151,9 +156,15 @@ function TripDetails({ trip }: { trip: TripWithCounts }): ReactNode {
           <li>{trip.waypointCount} waypoints</li>
         </ul>
         <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-          Routes and waypoints can be created from Phase 2; tracks are imported
-          in Phase 3.
+          Tracks are imported from recorded GPS files, which arrives in a later
+          phase.
         </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button onClick={() => actions.startDrawingRoute()}>New Route</Button>
+          <Button onClick={() => actions.startPlacingWaypoint()}>
+            New Waypoint
+          </Button>
+        </div>
       </Field>
 
       <Field label="Created">
@@ -182,9 +193,11 @@ function FolderDetails({ folder }: { folder: Folder }): ReactNode {
 }
 
 export function PropertiesPanel(): ReactNode {
-  const { selected, trip, folder, loading, reload } = useSelectionStore();
+  const { selected, trip, folder, route, waypoint, loading, reload } =
+    useSelectionStore();
   const refresh = useLibraryStore((s) => s.refresh);
   const showToast = useUiStore((s) => s.showToast);
+  const settings = useSettingsStore((s) => s.settings);
 
   const commit = async (patch: {
     name?: string;
@@ -214,7 +227,36 @@ export function PropertiesPanel(): ReactNode {
     );
   }
 
+  if (selected.kind === "route") {
+    if (route === null) {
+      return (
+        <div className="p-4 text-[12px] text-[var(--color-text-muted)]">
+          Loading…
+        </div>
+      );
+    }
+    return (
+      <RouteProperties
+        route={route}
+        units={settings.units}
+        planningSpeedKmh={settings.planningSpeedKmh}
+      />
+    );
+  }
+
+  if (selected.kind === "waypoint") {
+    if (waypoint === null) {
+      return (
+        <div className="p-4 text-[12px] text-[var(--color-text-muted)]">
+          Loading…
+        </div>
+      );
+    }
+    return <WaypointProperties waypoint={waypoint} units={settings.units} />;
+  }
+
   if (selected.kind !== "trip" && selected.kind !== "folder") {
+    // Tracks arrive in Phase 3.
     return (
       <div className="p-4 text-[12px] text-[var(--color-text-secondary)]">
         {selected.kind} properties arrive with that feature in a later phase.

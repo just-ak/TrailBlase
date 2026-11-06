@@ -1,5 +1,5 @@
-@import 'tailwindcss';
-@import 'leaflet/dist/leaflet.css';
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 /*
  * Dark mode is driven by a class on <html>, set from the persisted theme
@@ -20,7 +20,7 @@
   --color-danger: #dc2626;
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica,
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica,
     Arial, sans-serif;
 }
 
@@ -65,6 +65,17 @@ textarea {
 .leaflet-container {
   font-family: var(--font-sans);
   background: var(--color-surface-sunken);
+}
+
+/*
+ * While drawing a route or placing a waypoint, every click must reach the map
+ * surface. Without this, a click that happens to land on an existing route
+ * line or marker is swallowed by that layer's own handler and no point is
+ * placed — which looks exactly like the map ignoring the user.
+ */
+.trailrt-map-capture .leaflet-overlay-pane,
+.trailrt-map-capture .leaflet-marker-pane {
+  pointer-events: none;
 }
 
 .leaflet-control-attribution {

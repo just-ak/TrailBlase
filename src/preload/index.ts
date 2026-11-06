@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { CHANNELS, EVENTS, type MenuAction } from '@shared/ipc/channels';
 import type { TrailRtApi } from '@shared/ipc/api';
+import type { UndoState } from '@shared/domain/types';
 
 /**
  * The context bridge surface.
@@ -67,6 +68,41 @@ const api: TrailRtApi = {
     createTo: () => call(CHANNELS.backup.createTo),
     restore: (req) => call(CHANNELS.backup.restore, req),
   },
+  routes: {
+    listForTrip: (req) => call(CHANNELS.routes.listForTrip, req),
+    listAll: () => call(CHANNELS.routes.listAll),
+    get: (req) => call(CHANNELS.routes.get, req),
+    create: (req) => call(CHANNELS.routes.create, req),
+    update: (req) => call(CHANNELS.routes.update, req),
+    setGeometry: (req) => call(CHANNELS.routes.setGeometry, req),
+    reverse: (req) => call(CHANNELS.routes.reverse, req),
+    duplicate: (req) => call(CHANNELS.routes.duplicate, req),
+    move: (req) => call(CHANNELS.routes.move, req),
+    delete: (req) => call(CHANNELS.routes.delete, req),
+  },
+  waypoints: {
+    listForTrip: (req) => call(CHANNELS.waypoints.listForTrip, req),
+    listAll: () => call(CHANNELS.waypoints.listAll),
+    get: (req) => call(CHANNELS.waypoints.get, req),
+    create: (req) => call(CHANNELS.waypoints.create, req),
+    update: (req) => call(CHANNELS.waypoints.update, req),
+    move: (req) => call(CHANNELS.waypoints.move, req),
+    duplicate: (req) => call(CHANNELS.waypoints.duplicate, req),
+    moveToTrip: (req) => call(CHANNELS.waypoints.moveToTrip, req),
+    delete: (req) => call(CHANNELS.waypoints.delete, req),
+    search: (req) => call(CHANNELS.waypoints.search, req),
+    groups: (req) => call(CHANNELS.waypoints.groups, req),
+    createGroup: (req) => call(CHANNELS.waypoints.createGroup, req),
+  },
+  geometry: {
+    forTrip: (req) => call(CHANNELS.geometry.forTrip, req),
+  },
+  undo: {
+    state: () => call(CHANNELS.undo.state),
+    undo: () => call(CHANNELS.undo.undo),
+    redo: () => call(CHANNELS.undo.redo),
+    clear: () => call(CHANNELS.undo.clear),
+  },
   app: {
     info: () => call(CHANNELS.app.info),
     licences: () => call(CHANNELS.app.licences),
@@ -79,6 +115,8 @@ const api: TrailRtApi = {
       subscribe<[boolean]>(EVENTS.themeChanged, listener),
     onLibraryChanged: (listener) =>
       subscribe<[]>(EVENTS.libraryChanged, listener),
+    onUndoStateChanged: (listener) =>
+      subscribe<[UndoState]>(EVENTS.undoStateChanged, listener),
   },
 };
 
