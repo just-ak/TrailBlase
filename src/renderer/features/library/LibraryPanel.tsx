@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { ObjectRef, TreeNode, TripSortKey } from '@shared/domain/types';
-import { ContextMenu, type MenuItem } from '../../components/ContextMenu';
-import { api, call, describeError } from '../../lib/client';
-import { useLibraryStore } from '../../stores/libraryStore';
-import { useSelectionStore } from '../../stores/selectionStore';
-import { useUiStore } from '../../stores/uiStore';
-import { TreeRow } from './TreeRow';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import type { ObjectRef, TreeNode, TripSortKey } from "@shared/domain/types";
+import { ContextMenu, type MenuItem } from "../../components/ContextMenu";
+import { api, call, describeError } from "../../lib/client";
+import { useLibraryStore } from "../../stores/libraryStore";
+import { useSelectionStore } from "../../stores/selectionStore";
+import { useUiStore } from "../../stores/uiStore";
+import { TreeRow } from "./TreeRow";
 
 /**
  * The left panel: a hierarchical library of folders and trips.
@@ -16,17 +22,35 @@ import { TreeRow } from './TreeRow';
  */
 
 interface DragPayload {
-  kind: 'trip' | 'folder';
+  kind: "trip" | "folder";
   id: string;
 }
 
-const MIME = 'application/x-trailrt-node';
+const MIME = "application/x-trailrt-node";
+
+const onDragStart =
+  (node: TreeNode) =>
+  (event: React.DragEvent): void => {
+    const ref = parseNodeId(node.id);
+    if (ref === null || (ref.kind !== "trip" && ref.kind !== "folder")) return;
+    const payload: DragPayload = { kind: ref.kind, id: ref.id };
+    event.dataTransfer.setData(MIME, JSON.stringify(payload));
+    // "move", not "copy": dragging reparents rather than duplicating. ADR 0004.
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+/** Folders accept drops; so does the Trips view, meaning "move to the root". */
+function canDropOn(node: TreeNode): boolean {
+  return (
+    node.kind === "folder" || (node.kind === "view" && node.viewId === "trips")
+  );
+}
 
 function parseNodeId(id: string): ObjectRef | null {
-  const [kind, rest] = id.split(':');
+  const [kind, rest] = id.split(":");
   if (rest === undefined) return null;
-  if (kind === 'trip') return { kind: 'trip', id: rest };
-  if (kind === 'folder') return { kind: 'folder', id: rest };
+  if (kind === "trip") return { kind: "trip", id: rest };
+  if (kind === "folder") return { kind: "folder", id: rest };
   return null;
 }
 
@@ -54,7 +78,11 @@ export function LibraryPanel(): ReactNode {
   const showToast = useUiStore((s) => s.showToast);
   const openDialog = useUiStore((s) => s.openDialog);
 
-  const [menu, setMenu] = useState<{ x: number; y: number; node: TreeNode } | null>(null);
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+    node: TreeNode;
+  } | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
@@ -77,14 +105,14 @@ export function LibraryPanel(): ReactNode {
     async (folderId: string | null) => {
       try {
         const trip = await call(
-          api().trips.create({ name: 'New Trip', folderId }),
+          api().trips.create({ name: "New Trip", folderId }),
         );
         await refresh();
-        await select({ kind: 'trip', id: trip.id });
+        await select({ kind: "trip", id: trip.id });
         // Straight into rename, which is what the user wants next.
         setRenamingId(`trip:${trip.id}`);
       } catch (cause) {
-        showToast(describeError(cause), 'error');
+        showToast(describeError(cause), "error");
       }
     },
     [refresh, select, showToast],
@@ -94,14 +122,14 @@ export function LibraryPanel(): ReactNode {
     async (parentId: string | null) => {
       try {
         const folder = await call(
-          api().folders.create({ name: 'New Folder', parentId }),
+          api().folders.create({ name: "New Folder", parentId }),
         );
         if (parentId !== null) setExpanded(`folder:${parentId}`, true);
         await refresh();
-        await select({ kind: 'folder', id: folder.id });
+        await select({ kind: "folder", id: folder.id });
         setRenamingId(`folder:${folder.id}`);
       } catch (cause) {
-        showToast(describeError(cause), 'error');
+        showToast(describeError(cause), "error");
       }
     },
     [refresh, select, setExpanded, showToast],
@@ -114,11 +142,11 @@ export function LibraryPanel(): ReactNode {
       if (ref === null) return;
       const trimmed = name.trim();
       if (trimmed.length === 0) {
-        showToast('A name cannot be empty.', 'error');
+        showToast("A name cannot be empty.", "error");
         return;
       }
       try {
-        if (ref.kind === 'trip') {
+        if (ref.kind === "trip") {
           await call(api().trips.update({ id: ref.id, name: trimmed }));
         } else {
           await call(api().folders.rename({ id: ref.id, name: trimmed }));
@@ -126,7 +154,7 @@ export function LibraryPanel(): ReactNode {
         await refresh();
         await useSelectionStore.getState().reload();
       } catch (cause) {
-        showToast(describeError(cause), 'error');
+        showToast(describeError(cause), "error");
       }
     },
     [refresh, showToast],
@@ -137,9 +165,9 @@ export function LibraryPanel(): ReactNode {
       try {
         const copy = await call(api().trips.duplicate({ id }));
         await refresh();
-        await select({ kind: 'trip', id: copy.id });
+        await select({ kind: "trip", id: copy.id });
       } catch (cause) {
-        showToast(describeError(cause), 'error');
+        showToast(describeError(cause), "error");
       }
     },
     [refresh, select, showToast],
@@ -149,11 +177,14 @@ export function LibraryPanel(): ReactNode {
     async (id: string, archived: boolean) => {
       try {
         await call(
-          api().trips.setStatus({ id, status: archived ? 'archived' : 'active' }),
+          api().trips.setStatus({
+            id,
+            status: archived ? "archived" : "active",
+          }),
         );
         await refresh();
       } catch (cause) {
-        showToast(describeError(cause), 'error');
+        showToast(describeError(cause), "error");
       }
     },
     [refresh, showToast],
@@ -163,11 +194,11 @@ export function LibraryPanel(): ReactNode {
   const confirmDelete = useCallback(
     async (ref: ObjectRef, name: string) => {
       try {
-        if (ref.kind === 'trip') {
+        if (ref.kind === "trip") {
           const trip = await call(api().trips.get({ id: ref.id }));
           openDialog({
-            kind: 'confirmDelete',
-            target: { type: 'trip', id: ref.id, name },
+            kind: "confirmDelete",
+            target: { type: "trip", id: ref.id, name },
             counts: {
               routes: trip.routeCount,
               tracks: trip.trackCount,
@@ -176,13 +207,13 @@ export function LibraryPanel(): ReactNode {
           });
         } else {
           openDialog({
-            kind: 'confirmDelete',
-            target: { type: 'folder', id: ref.id, name },
+            kind: "confirmDelete",
+            target: { type: "folder", id: ref.id, name },
             counts: {},
           });
         }
       } catch (cause) {
-        showToast(describeError(cause), 'error');
+        showToast(describeError(cause), "error");
       }
     },
     [openDialog, showToast],
@@ -190,92 +221,93 @@ export function LibraryPanel(): ReactNode {
 
   // ------------------------------------------------------- drag and drop
 
-  const onDragStart = (node: TreeNode) => (event: React.DragEvent): void => {
-    const ref = parseNodeId(node.id);
-    if (ref === null || ref.kind === 'route') return;
-    const payload: DragPayload = { kind: ref.kind as 'trip' | 'folder', id: ref.id };
-    event.dataTransfer.setData(MIME, JSON.stringify(payload));
-    // "move", not "copy": dragging reparents. ADR 0004.
-    event.dataTransfer.effectAllowed = 'move';
-  };
+  const onDragOver =
+    (node: TreeNode) =>
+    (event: React.DragEvent): void => {
+      if (!event.dataTransfer.types.includes(MIME) || !canDropOn(node)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setDropTargetId(node.id);
+    };
 
-  const canDropOn = (node: TreeNode): boolean =>
-    node.kind === 'folder' || (node.kind === 'view' && node.viewId === 'trips');
+  const onDrop =
+    (node: TreeNode) =>
+    (event: React.DragEvent): void => {
+      event.preventDefault();
+      setDropTargetId(null);
+      if (!canDropOn(node)) return;
 
-  const onDragOver = (node: TreeNode) => (event: React.DragEvent): void => {
-    if (!event.dataTransfer.types.includes(MIME) || !canDropOn(node)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    setDropTargetId(node.id);
-  };
+      const raw = event.dataTransfer.getData(MIME);
+      if (raw.length === 0) return;
 
-  const onDrop = (node: TreeNode) => (event: React.DragEvent): void => {
-    event.preventDefault();
-    setDropTargetId(null);
-    if (!canDropOn(node)) return;
-
-    const raw = event.dataTransfer.getData(MIME);
-    if (raw.length === 0) return;
-
-    let payload: DragPayload;
-    try {
-      payload = JSON.parse(raw) as DragPayload;
-    } catch {
-      return;
-    }
-
-    // Dropping on the Trips view means "move to the root".
-    const destination =
-      node.kind === 'folder' ? (parseNodeId(node.id)?.id ?? null) : null;
-
-    void (async () => {
+      let payload: DragPayload;
       try {
-        if (payload.kind === 'trip') {
-          await call(api().trips.move({ id: payload.id, folderId: destination }));
-        } else {
-          if (payload.id === destination) return;
-          await call(
-            api().folders.move({ id: payload.id, parentId: destination }),
-          );
-        }
-        if (destination !== null) setExpanded(`folder:${destination}`, true);
-        await refresh();
-      } catch (cause) {
-        // A rejected cycle lands here with the main process's explanation.
-        showToast(describeError(cause), 'error');
+        payload = JSON.parse(raw) as DragPayload;
+      } catch {
+        return;
       }
-    })();
-  };
+
+      // Dropping on the Trips view means "move to the root".
+      const destination =
+        node.kind === "folder" ? (parseNodeId(node.id)?.id ?? null) : null;
+
+      void (async () => {
+        try {
+          if (payload.kind === "trip") {
+            await call(
+              api().trips.move({ id: payload.id, folderId: destination }),
+            );
+          } else {
+            if (payload.id === destination) return;
+            await call(
+              api().folders.move({ id: payload.id, parentId: destination }),
+            );
+          }
+          if (destination !== null) setExpanded(`folder:${destination}`, true);
+          await refresh();
+        } catch (cause) {
+          // A rejected cycle lands here with the main process's explanation.
+          showToast(describeError(cause), "error");
+        }
+      })();
+    };
 
   // -------------------------------------------------------- context menu
 
   const menuItems = (node: TreeNode): MenuItem[] => {
     const ref = parseNodeId(node.id);
 
-    if (node.kind === 'view' && node.viewId === 'trips') {
+    if (node.kind === "view" && node.viewId === "trips") {
       return [
-        { label: 'New Trip', onSelect: () => void createTrip(null) },
-        { label: 'New Folder', onSelect: () => void createFolder(null) },
+        { label: "New Trip", onSelect: () => void createTrip(null) },
+        { label: "New Folder", onSelect: () => void createFolder(null) },
       ];
     }
 
-    if (node.kind === 'view') {
+    if (node.kind === "view") {
       return [
         {
           label: node.name,
           disabled: true,
-          disabledReason: 'This view becomes available in a later phase.',
+          disabledReason: "This view becomes available in a later phase.",
         },
       ];
     }
 
-    if (ref?.kind === 'folder') {
+    if (ref?.kind === "folder") {
       return [
-        { label: 'New Trip in Folder', onSelect: () => void createTrip(ref.id) },
-        { label: 'New Subfolder', onSelect: () => void createFolder(ref.id) },
-        { label: 'Rename…', separatorBefore: true, onSelect: () => setRenamingId(node.id) },
         {
-          label: 'Delete Folder…',
+          label: "New Trip in Folder",
+          onSelect: () => void createTrip(ref.id),
+        },
+        { label: "New Subfolder", onSelect: () => void createFolder(ref.id) },
+        {
+          label: "Rename…",
+          separatorBefore: true,
+          onSelect: () => setRenamingId(node.id),
+        },
+        {
+          label: "Delete Folder…",
           danger: true,
           separatorBefore: true,
           onSelect: () => void confirmDelete(ref, node.name),
@@ -283,20 +315,28 @@ export function LibraryPanel(): ReactNode {
       ];
     }
 
-    if (ref?.kind === 'trip') {
-      const archived = node.status === 'archived';
+    if (ref?.kind === "trip") {
+      const archived = node.status === "archived";
       return [
-        { label: 'Rename…', onSelect: () => setRenamingId(node.id) },
-        { label: 'Duplicate', onSelect: () => void duplicateTrip(ref.id) },
+        { label: "Rename…", onSelect: () => setRenamingId(node.id) },
+        { label: "Duplicate", onSelect: () => void duplicateTrip(ref.id) },
         {
-          label: archived ? 'Unarchive' : 'Archive',
+          label: archived ? "Unarchive" : "Archive",
           separatorBefore: true,
           onSelect: () => void setArchived(ref.id, !archived),
         },
-        { label: 'New Route', disabled: true, disabledReason: 'Arrives in Phase 2' },
-        { label: 'New Waypoint', disabled: true, disabledReason: 'Arrives in Phase 2' },
         {
-          label: 'Delete Trip…',
+          label: "New Route",
+          disabled: true,
+          disabledReason: "Arrives in Phase 2",
+        },
+        {
+          label: "New Waypoint",
+          disabled: true,
+          disabledReason: "Arrives in Phase 2",
+        },
+        {
+          label: "Delete Trip…",
           danger: true,
           separatorBefore: true,
           onSelect: () => void confirmDelete(ref, node.name),
@@ -304,27 +344,27 @@ export function LibraryPanel(): ReactNode {
       ];
     }
 
-    return [{ label: 'New Trip', onSelect: () => void createTrip(null) }];
+    return [{ label: "New Trip", onSelect: () => void createTrip(null) }];
   };
 
   // Exposed so the native Trip menu can drive the same actions.
   useEffect(() => {
     return api().events.onMenuAction((action) => {
       const ref = useSelectionStore.getState().selected;
-      if (action === 'trip:new') void createTrip(null);
-      else if (action === 'folder:new') void createFolder(null);
-      else if (action === 'trip:rename' && ref !== null) {
+      if (action === "trip:new") void createTrip(null);
+      else if (action === "folder:new") void createFolder(null);
+      else if (action === "trip:rename" && ref !== null) {
         setRenamingId(`${ref.kind}:${ref.id}`);
-      } else if (action === 'trip:duplicate' && ref?.kind === 'trip') {
+      } else if (action === "trip:duplicate" && ref?.kind === "trip") {
         void duplicateTrip(ref.id);
       } else if (
-        (action === 'trip:delete' || action === 'selection:delete') &&
+        (action === "trip:delete" || action === "selection:delete") &&
         ref !== null
       ) {
         const name =
           useSelectionStore.getState().trip?.name ??
           useSelectionStore.getState().folder?.name ??
-          'this item';
+          "this item";
         void confirmDelete(ref, name);
       }
     });
@@ -362,7 +402,7 @@ export function LibraryPanel(): ReactNode {
         }}
         onRenameCommit={(name) => void commitRename(node.id, name)}
         onRenameCancel={() => setRenamingId(null)}
-        {...(node.kind === 'trip' || node.kind === 'folder'
+        {...(node.kind === "trip" || node.kind === "folder"
           ? { onDragStart: onDragStart(node) }
           : {})}
         onDragOver={onDragOver(node)}
@@ -412,10 +452,12 @@ export function LibraryPanel(): ReactNode {
           <button
             type="button"
             aria-label="Toggle sort direction"
-            onClick={() => setSort(sortKey, sortDirection === 'asc' ? 'desc' : 'asc')}
+            onClick={() =>
+              setSort(sortKey, sortDirection === "asc" ? "desc" : "asc")
+            }
             className="rounded border border-[var(--color-border-subtle)] px-1.5 py-0.5 hover:bg-[var(--color-surface-sunken)]"
           >
-            {sortDirection === 'asc' ? '↑' : '↓'}
+            {sortDirection === "asc" ? "↑" : "↓"}
           </button>
           <label className="ml-auto flex items-center gap-1">
             <input
@@ -434,32 +476,37 @@ export function LibraryPanel(): ReactNode {
         className="min-h-0 flex-1 overflow-y-auto py-1"
         onContextMenu={(event) => {
           event.preventDefault();
-          if (tree !== null) setMenu({ x: event.clientX, y: event.clientY, node: tree });
+          if (tree !== null)
+            setMenu({ x: event.clientX, y: event.clientY, node: tree });
         }}
       >
         {loading && tree === null && (
-          <p className="px-3 py-2 text-[12px] text-[var(--color-text-muted)]">Loading…</p>
+          <p className="px-3 py-2 text-[12px] text-[var(--color-text-muted)]">
+            Loading…
+          </p>
         )}
 
         {error !== null && (
-          <p className="px-3 py-2 text-[12px] text-[var(--color-danger)]">{error}</p>
+          <p className="px-3 py-2 text-[12px] text-[var(--color-danger)]">
+            {error}
+          </p>
         )}
 
         {searching ? (
           <div>
             <p className="px-3 py-1 text-[11px] font-semibold tracking-wide text-[var(--color-text-muted)] uppercase">
               {searchResults?.length ?? 0} match
-              {(searchResults?.length ?? 0) === 1 ? '' : 'es'}
+              {(searchResults?.length ?? 0) === 1 ? "" : "es"}
             </p>
             {(searchResults ?? []).map((trip) => (
               <button
                 key={trip.id}
                 type="button"
-                onClick={() => void select({ kind: 'trip', id: trip.id })}
+                onClick={() => void select({ kind: "trip", id: trip.id })}
                 className={`block w-full truncate px-3 py-1 text-left text-[13px] ${
                   selectedNodeId === `trip:${trip.id}`
-                    ? 'bg-[var(--color-accent)] text-white'
-                    : 'hover:bg-[var(--color-surface-sunken)]'
+                    ? "bg-[var(--color-accent)] text-white"
+                    : "hover:bg-[var(--color-surface-sunken)]"
                 }`}
               >
                 🗺️ {trip.name}

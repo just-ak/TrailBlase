@@ -74,7 +74,7 @@ test.describe('security posture', () => {
 
   test('exposes only the named bridge, with no generic invoke', async () => {
     const api = await harness.page.evaluate(() => ({
-      namespaces: Object.keys(window.trailrt).sort(),
+      namespaces: Object.keys(window.trailrt).toSorted(),
       hasInvoke: 'invoke' in window.trailrt,
       hasSend: 'send' in window.trailrt,
     }));

@@ -86,19 +86,18 @@ export function applyMigrations(sqlite: SqliteDatabase): MigrationResult {
   ensureMigrationTable(sqlite);
   const done = appliedVersions(sqlite);
 
-  const pending = [...MIGRATIONS]
-    .sort((a, b) => a.version - b.version)
-    .filter((m) => !done.has(m.version));
+  const pending = MIGRATIONS.toSorted((a, b) => a.version - b.version).filter(
+    (m) => !done.has(m.version),
+  );
 
   for (const migration of pending) {
     applyOne(sqlite, migration);
   }
 
-  const versions = [...MIGRATIONS].map((m) => m.version);
   return {
     applied: pending.map((m) => m.version),
     alreadyCurrent: pending.length === 0,
-    schemaVersion: versions.length > 0 ? Math.max(...versions) : 0,
+    schemaVersion: expectedSchemaVersion(),
   };
 }
 

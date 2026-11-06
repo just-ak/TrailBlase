@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { MAP_PROVIDERS } from '@shared/map/MapProvider';
-import type { MapPosition } from '@shared/domain/types';
-import { api, callOr } from '../../lib/client';
-import { useSettingsStore } from '../../stores/settingsStore';
-import { useUiStore } from '../../stores/uiStore';
-import { useLeafletMap } from './useLeafletMap';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { MAP_PROVIDERS } from "@shared/map/MapProvider";
+import type { MapPosition } from "@shared/domain/types";
+import { api, callOr } from "../../lib/client";
+import { useSettingsStore } from "../../stores/settingsStore";
+import { useUiStore } from "../../stores/uiStore";
+import { useLeafletMap } from "./useLeafletMap";
 
 /**
  * The centre workspace.
@@ -19,9 +25,9 @@ export function MapView(): ReactNode {
   const setOffline = useUiStore((s) => s.setMapOffline);
   const [layerMenuOpen, setLayerMenuOpen] = useState(false);
 
-  // Captured once: the hook treats these as initial values, and re-centring
-  // later goes through flyTo rather than rebuilding the map.
-  const initial = useRef<MapPosition>(settings.mapPosition);
+  // Frozen on first render. A useState initialiser is the idiomatic way to
+  // capture a one-time value; a ref read during render is not.
+  const [initialPosition] = useState<MapPosition>(() => settings.mapPosition);
 
   const persistTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const onPositionChange = useCallback((position: MapPosition) => {
@@ -30,7 +36,7 @@ export function MapView(): ReactNode {
     persistTimer.current = setTimeout(() => {
       void callOr(
         api().settings.set({
-          key: 'mapPosition',
+          key: "mapPosition",
           value: {
             lat: Number(position.lat.toFixed(6)),
             lon: Number(position.lon.toFixed(6)),
@@ -44,7 +50,7 @@ export function MapView(): ReactNode {
 
   const map = useLeafletMap({
     providerId: settings.mapProviderId,
-    initial: initial.current,
+    initial: initialPosition,
     onPositionChange,
     onTileError: setOffline,
   });
@@ -52,23 +58,23 @@ export function MapView(): ReactNode {
   // Menu actions for zoom and layers are dispatched from the native menu.
   useEffect(() => {
     return api().events.onMenuAction((action) => {
-      if (action === 'map:zoomIn') map.zoomIn();
-      else if (action === 'map:zoomOut') map.zoomOut();
-      else if (action === 'map:layers') setLayerMenuOpen((open) => !open);
-      else if (action === 'map:fitTrip') {
+      if (action === "map:zoomIn") map.zoomIn();
+      else if (action === "map:zoomOut") map.zoomOut();
+      else if (action === "map:layers") setLayerMenuOpen((open) => !open);
+      else if (action === "map:fitTrip") {
         // Honest about the limitation: there is no geometry to fit until
         // Phase 2 adds routes and waypoints.
         useUiStore
           .getState()
           .showToast(
-            'Nothing to fit yet — trips get routes and waypoints in the next phase.',
+            "Nothing to fit yet — trips get routes and waypoints in the next phase.",
           );
       }
     });
   }, [map]);
 
   const setProvider = async (id: string): Promise<void> => {
-    await useSettingsStore.getState().set({ key: 'mapProviderId', value: id });
+    await useSettingsStore.getState().set({ key: "mapProviderId", value: id });
     setLayerMenuOpen(false);
   };
 
@@ -82,6 +88,13 @@ export function MapView(): ReactNode {
 
   return (
     <div className="relative flex-1 overflow-hidden">
+      {/*
+        oxlint's react(refs) rule flags this as reading a ref during render,
+        but passing a ref object to `ref=` is the documented React API and does
+        not read `.current`. Narrowly suppressed rather than restructuring
+        working, tested map lifecycle code around a false positive.
+      */}
+      {/* oxlint-disable-next-line react/refs */}
       <div ref={map.containerRef} className="absolute inset-0" />
 
       {/* Controls, floated over the map. */}
@@ -90,7 +103,7 @@ export function MapView(): ReactNode {
           <button
             type="button"
             aria-label="Zoom in"
-            onClick={map.zoomIn}
+            onClick={() => map.zoomIn()}
             className="h-8 w-8 text-[16px] leading-none text-[var(--color-text-primary)] hover:bg-[var(--color-surface-sunken)]"
           >
             +
@@ -99,7 +112,7 @@ export function MapView(): ReactNode {
           <button
             type="button"
             aria-label="Zoom out"
-            onClick={map.zoomOut}
+            onClick={() => map.zoomOut()}
             className="h-8 w-8 text-[16px] leading-none text-[var(--color-text-primary)] hover:bg-[var(--color-surface-sunken)]"
           >
             −
@@ -137,8 +150,8 @@ export function MapView(): ReactNode {
                   onClick={() => void setProvider(provider.id)}
                   className={`block w-full px-3 py-1.5 text-left text-[13px] hover:bg-[var(--color-surface-sunken)] ${
                     provider.id === settings.mapProviderId
-                      ? 'font-semibold text-[var(--color-accent)]'
-                      : 'text-[var(--color-text-primary)]'
+                      ? "font-semibold text-[var(--color-accent)]"
+                      : "text-[var(--color-text-primary)]"
                   }`}
                 >
                   {provider.name}

@@ -22,15 +22,15 @@
   <text class="sub" x="48" y="72">Garmin BaseCamp replacement · macOS · Electron + React · GPL-3.0 · 5 phases · 53 tracked tasks</text>
 
   <rect x="48" y="86" width="420" height="9" rx="4.5" fill="#e2e8f0"/>
-  <rect x="48" y="86" width="76" height="9" rx="4.5" fill="#16a34a"/>
-  <text class="pct" x="482" y="95">9 / 53 verified complete (17%) — Phase 1 not started</text>
+  <rect x="48" y="86" width="214" height="9" rx="4.5" fill="#16a34a"/>
+  <text class="pct" x="482" y="95">27 / 53 verified complete (51%) — Phase 1 done, Phase 2 next</text>
 
   <g class="legend">
-    <circle cx="1012" cy="54" r="5" fill="#16a34a"/><text x="1026" y="59">Done (9)</text>
-    <circle cx="1122" cy="54" r="5" fill="#f59e0b"/><text x="1136" y="59">In progress (0)</text>
-    <circle cx="1272" cy="54" r="5" fill="#94a3b8"/><text x="1286" y="59">Not started (41)</text>
-    <circle cx="1432" cy="54" r="5" fill="#8b5cf6"/><text x="1446" y="59">Investigation (3)</text>
-    <circle cx="1596" cy="54" r="5" fill="#dc2626"/><text x="1610" y="59">Blocked (0)</text>
+    <circle cx="1012" cy="54" r="5" fill="#16a34a"/><text x="1026" y="59">Done (27)</text>
+    <circle cx="1130" cy="54" r="5" fill="#f59e0b"/><text x="1144" y="59">In progress (0)</text>
+    <circle cx="1280" cy="54" r="5" fill="#94a3b8"/><text x="1294" y="59">Not started (23)</text>
+    <circle cx="1440" cy="54" r="5" fill="#8b5cf6"/><text x="1454" y="59">Investigation (3)</text>
+    <circle cx="1604" cy="54" r="5" fill="#dc2626"/><text x="1618" y="59">Blocked (0)</text>
   </g>
   <line x1="48" y1="114" x2="1792" y2="114" stroke="#e2e8f0" stroke-width="1.5"/>
 
@@ -40,7 +40,7 @@
     <!-- centre -->
     <rect x="800" y="620" width="240" height="80" rx="14" fill="#0f172a"/>
     <text x="920" y="653" font-size="22" font-weight="700" fill="#ffffff" text-anchor="middle">TrailRT</text>
-    <text x="920" y="677" font-size="13" fill="#94a3b8" text-anchor="middle">Phase 1 is next</text>
+    <text x="920" y="677" font-size="13" fill="#94a3b8" text-anchor="middle">Phase 2 is next</text>
 
     <!-- trunks -->
     <path class="link" stroke="#2563eb" d="M1040 660 C1082 660, 1082 309, 1125 309"/>
@@ -51,9 +51,9 @@
     <path class="link" stroke="#7c3aed" d="M800 660 C758 660, 758 888, 715 888"/>
 
     <!-- ============ PHASE 1 — Foundation (right) ============ -->
-    <rect x="1125" y="283" width="210" height="52" rx="10" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+    <rect x="1125" y="283" width="210" height="52" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="2.5"/>
     <text class="phase" x="1230" y="306" fill="#2563eb">Phase 1 · Foundation</text>
-    <text class="count" x="1230" y="325">0 / 18 tasks</text>
+    <text class="count" x="1230" y="325">18 / 18 complete</text>
 
     <path class="link" stroke="#2563eb" d="M1335 309 C1367 309, 1367 20, 1400 20"/>
     <path class="link" stroke="#2563eb" d="M1335 309 C1367 309, 1367 54, 1400 54"/>
@@ -74,24 +74,24 @@
     <path class="link" stroke="#2563eb" d="M1335 309 C1367 309, 1367 564, 1400 564"/>
     <path class="link" stroke="#2563eb" d="M1335 309 C1367 309, 1367 598, 1400 598"/>
 
-    <circle data-status="todo" cx="1400" cy="20"  r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="20"  dy="0.35em">Scaffold &amp; toolchain install</text>
-    <circle data-status="todo" cx="1400" cy="54"  r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="54"  dy="0.35em">Native module vs Electron ABI</text>
-    <circle data-status="todo" cx="1400" cy="88"  r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="88"  dy="0.35em">Secure Electron shell + CSP</text>
-    <circle data-status="todo" cx="1400" cy="122" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="122" dy="0.35em">Shared contracts (IPC, geo)</text>
-    <circle data-status="todo" cx="1400" cy="156" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="156" dy="0.35em">SQLite schema &amp; migrations</text>
-    <circle data-status="todo" cx="1400" cy="190" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="190" dy="0.35em">Trip &amp; folder services</text>
-    <circle data-status="todo" cx="1400" cy="224" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="224" dy="0.35em">IPC &amp; preload bridge</text>
-    <circle data-status="todo" cx="1400" cy="258" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="258" dy="0.35em">Three-panel layout</text>
-    <circle data-status="todo" cx="1400" cy="292" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="292" dy="0.35em">Trip library tree</text>
-    <circle data-status="todo" cx="1400" cy="326" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="326" dy="0.35em">Map panel (Leaflet + OSM)</text>
-    <circle data-status="todo" cx="1400" cy="360" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="360" dy="0.35em">Properties panel</text>
-    <circle data-status="todo" cx="1400" cy="394" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="394" dy="0.35em">Application menus</text>
-    <circle data-status="todo" cx="1400" cy="428" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="428" dy="0.35em">Settings &amp; theming</text>
-    <circle data-status="todo" cx="1400" cy="462" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="462" dy="0.35em">Backup &amp; restore</text>
-    <circle data-status="todo" cx="1400" cy="496" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="496" dy="0.35em">End-to-end tests</text>
-    <circle data-status="todo" cx="1400" cy="530" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="530" dy="0.35em">Licence notices &amp; About</text>
-    <circle data-status="todo" cx="1400" cy="564" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="564" dy="0.35em">Build, DMG &amp; ad-hoc signing</text>
-    <circle data-status="todo" cx="1400" cy="598" r="5" fill="#94a3b8"/><text class="leaf lr" x="1416" y="598" dy="0.35em">Phase 1 verification pass</text>
+    <circle data-status="done" cx="1400" cy="20"  r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="20"  dy="0.35em">Scaffold &amp; toolchain install</text>
+    <circle data-status="done" cx="1400" cy="54"  r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="54"  dy="0.35em">Native module vs Electron ABI</text>
+    <circle data-status="done" cx="1400" cy="88"  r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="88"  dy="0.35em">Secure Electron shell + CSP</text>
+    <circle data-status="done" cx="1400" cy="122" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="122" dy="0.35em">Shared contracts (IPC, geo)</text>
+    <circle data-status="done" cx="1400" cy="156" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="156" dy="0.35em">SQLite schema &amp; migrations</text>
+    <circle data-status="done" cx="1400" cy="190" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="190" dy="0.35em">Trip &amp; folder services</text>
+    <circle data-status="done" cx="1400" cy="224" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="224" dy="0.35em">IPC &amp; preload bridge</text>
+    <circle data-status="done" cx="1400" cy="258" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="258" dy="0.35em">Three-panel layout</text>
+    <circle data-status="done" cx="1400" cy="292" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="292" dy="0.35em">Trip library tree</text>
+    <circle data-status="done" cx="1400" cy="326" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="326" dy="0.35em">Map panel (Leaflet + OSM)</text>
+    <circle data-status="done" cx="1400" cy="360" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="360" dy="0.35em">Properties panel</text>
+    <circle data-status="done" cx="1400" cy="394" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="394" dy="0.35em">Application menus</text>
+    <circle data-status="done" cx="1400" cy="428" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="428" dy="0.35em">Settings &amp; theming</text>
+    <circle data-status="done" cx="1400" cy="462" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="462" dy="0.35em">Backup &amp; restore</text>
+    <circle data-status="done" cx="1400" cy="496" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="496" dy="0.35em">End-to-end tests (21 passing)</text>
+    <circle data-status="done" cx="1400" cy="530" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="530" dy="0.35em">Licence notices &amp; About</text>
+    <circle data-status="done" cx="1400" cy="564" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="564" dy="0.35em">Build, DMG &amp; ad-hoc signing</text>
+    <circle data-status="done" cx="1400" cy="598" r="5" fill="#16a34a"/><text class="leaf lr" x="1416" y="598" dy="0.35em">Phase 1 verification pass</text>
 
     <!-- ============ PHASE 2 — Routes & Waypoints (right) ============ -->
     <rect x="1125" y="750" width="210" height="52" rx="10" fill="#ffffff" stroke="#0891b2" stroke-width="2"/>
@@ -158,7 +158,7 @@
     <circle data-status="done" cx="440" cy="248" r="5" fill="#16a34a"/><text class="leaf ll" x="424" y="248" dy="0.35em">Source spec reviewed</text>
     <circle data-status="done" cx="440" cy="282" r="5" fill="#16a34a"/><text class="leaf ll" x="424" y="282" dy="0.35em">GPL-3.0 licence set</text>
     <circle data-status="done" cx="440" cy="316" r="5" fill="#16a34a"/><text class="leaf ll" x="424" y="316" dy="0.35em">Licence audit: 369 packages clean</text>
-    <circle data-status="done" cx="440" cy="350" r="5" fill="#16a34a"/><text class="leaf ll" x="424" y="350" dy="0.35em">ADRs 0001–0009</text>
+    <circle data-status="done" cx="440" cy="350" r="5" fill="#16a34a"/><text class="leaf ll" x="424" y="350" dy="0.35em">ADRs 0001–0010</text>
     <circle data-status="done" cx="440" cy="384" r="5" fill="#16a34a"/><text class="leaf ll" x="424" y="384" dy="0.35em">Phase 1 spec: reqs, design, tasks</text>
     <circle data-status="done" cx="440" cy="418" r="5" fill="#16a34a"/><text class="leaf ll" x="424" y="418" dy="0.35em">Phase 2–5 requirements</text>
 

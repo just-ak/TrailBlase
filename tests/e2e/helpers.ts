@@ -21,15 +21,31 @@ export function makeUserDataDir(): string {
   return mkdtempSync(join(tmpdir(), 'trailrt-e2e-'));
 }
 
+/**
+ * Launches the development build by default.
+ *
+ * Set TRAILRT_E2E_APP to the executable inside a packaged .app bundle to run
+ * the same suite against a real DMG install:
+ *
+ *   TRAILRT_E2E_APP="/Applications/TrailRT.app/Contents/MacOS/TrailRT" \
+ *     npx playwright test
+ *
+ * Phase 1's acceptance criteria are about the shipped application, so they are
+ * verified against the packaged bundle too, not only the dev output.
+ */
 export async function launch(userDataDir: string): Promise<Harness> {
-  const app = await electron.launch({
-    args: ['out/main/index.js'],
-    env: {
-      ...process.env,
-      TRAILRT_USER_DATA: userDataDir,
-      NODE_ENV: 'production',
-    },
-  });
+  const packaged = process.env.TRAILRT_E2E_APP;
+  const env = {
+    ...process.env,
+    TRAILRT_USER_DATA: userDataDir,
+    NODE_ENV: 'production',
+  };
+
+  const app = await electron.launch(
+    packaged !== undefined && packaged.length > 0
+      ? { executablePath: packaged, args: [], env }
+      : { args: ['out/main/index.js'], env },
+  );
 
   const page = await app.firstWindow();
   // The app renders a loading state until settings arrive, so wait for the

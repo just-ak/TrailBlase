@@ -149,21 +149,23 @@ async function start(): Promise<void> {
  * Failures are logged, not surfaced: a backup that cannot be written should not
  * interrupt the user's work, and the next tick will try again.
  */
-function scheduleAutomaticBackups(): void {
-  const runBackup = async (): Promise<void> => {
-    try {
-      const current = ctx();
-      const { backupRetention } = settingsService.all(current.handle.db);
-      await backupService.createBackup(
-        current.handle,
-        current.paths.backupsDir,
-        backupRetention,
-      );
-    } catch (cause) {
-      console.error('[backup] automatic backup failed:', cause);
-    }
-  };
+async function runBackup(): Promise<void> {
+  try {
+    const current = ctx();
+    const { backupRetention } = settingsService.all(current.handle.db);
+    await backupService.createBackup(
+      current.handle,
+      current.paths.backupsDir,
+      backupRetention,
+    );
+  } catch (cause) {
+    // A backup that cannot be written must not interrupt the user's work; the
+    // next tick will try again.
+    console.error('[backup] automatic backup failed:', cause);
+  }
+}
 
+function scheduleAutomaticBackups(): void {
   const intervalHours = settingsService.all(ctx().handle.db).backupIntervalHours;
   const timer = setInterval(
     () => void runBackup(),

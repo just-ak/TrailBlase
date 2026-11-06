@@ -93,7 +93,7 @@ if (flagged.length > 0) {
 const shipped = [...all.entries()]
   .filter(([name]) => SHIPPED.has(name))
   .map(([name, i]) => ({ name, version: i.version, licence: i.licence }))
-  .sort((a, b) => a.name.localeCompare(b.name));
+  .toSorted((a, b) => a.name.localeCompare(b.name));
 
 const tsOut = `/**
  * GENERATED FILE — do not edit by hand.
@@ -136,7 +136,7 @@ const lines = [
   '',
   '| Licence | Packages |',
   '| --- | --- |',
-  ...[...byLicence].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  ...[...byLicence].toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([lic, n]) => `| ${lic} | ${n} |`),
   '',
   '## Shipped in the application bundle',
@@ -163,7 +163,7 @@ const lines = [
   '',
   '| Package | Version | Licence |',
   '| --- | --- | --- |',
-  ...[...all.keys()].sort().map((n) => {
+  ...[...all.keys()].toSorted().map((n) => {
     const i = all.get(n);
     return `| \`${n}\` | ${i.version} | ${i.licence} |`;
   }),

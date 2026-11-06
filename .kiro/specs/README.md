@@ -46,3 +46,4 @@ settled.
 | 0007 | GPL-3.0-or-later licence, free distribution, dep audit   |
 | 0008 | Leaflet used directly; react-leaflet dropped on licence  |
 | 0009 | Ad-hoc signing until a Developer ID is available         |
+| 0010 | Native module ABI and Electron binary delivery findings  |

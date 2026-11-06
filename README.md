@@ -5,8 +5,21 @@ Electron with React and TypeScript. Plan, organise, view and edit outdoor trips,
 routes, tracks and waypoints, with OpenStreetMap as the initial map provider and
 no Garmin hardware or cloud account required.
 
-**Status: planning complete, implementation not started.** Phase 1 is specified
-and ready to build.
+**Status: Phase 1 complete and verified.** The app launches, renders an
+OpenStreetMap map, and manages trips and folders that persist across restarts.
+Phase 2 (routes and waypoints) is next.
+
+All four Phase 1 acceptance criteria are verified against the packaged DMG
+build, not just the development output: 110 unit tests and 21 end-to-end tests
+pass, with a clean typecheck and no lint errors.
+
+```sh
+nvm use          # Node 26
+npm install
+npm run dev      # development, with HMR
+npm run verify   # lint, typecheck, unit tests, build, end-to-end tests
+npm run package  # macOS .app + DMG for arm64 and x64
+```
 
 ![Implementation progress](docs/progress-mindmap.svg)
 
@@ -34,8 +47,9 @@ good set rather than an aspiration.
 
 ## Development phases
 
-1. **Foundation** — Electron shell, security baseline, SQLite with migrations,
-   three-panel layout, trip library, OpenStreetMap view, menus, settings, backup
+1. **Foundation** — _complete._ Electron shell, security baseline, SQLite with
+   migrations, three-panel layout, trip library, OpenStreetMap view, menus,
+   settings, backup and restore
 2. **Routes and waypoints** — drawing, editing, statistics, undo history
 3. **Tracks and import/export** — GPX, KML/KMZ, TCX, FIT, CSV, JSON, with an
    import report that never silently discards data

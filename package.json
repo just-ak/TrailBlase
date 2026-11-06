@@ -22,12 +22,13 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
-    "verify": "npm run lint && npm run typecheck && npm run test",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run test:e2e",
     "package": "npm run build && electron-builder --mac",
     "postinstall": "install-electron && electron-builder install-app-deps",
     "verify:native": "electron scripts/verify-native.mjs",
     "licences": "node scripts/generate-licences.mjs",
-    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json"
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
+    "licences:check": "node scripts/generate-licences.mjs"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",

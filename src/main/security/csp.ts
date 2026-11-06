@@ -51,7 +51,7 @@ export function installContentSecurityPolicy(isDev: boolean): void {
 
     callback({
       responseHeaders: {
-        ...(details.responseHeaders ?? {}),
+        ...details.responseHeaders,
         'Content-Security-Policy': [policy],
       },
     });

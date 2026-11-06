@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import type { MapPosition } from '@shared/domain/types';
 import { getMapProvider } from '@shared/map/MapProvider';
@@ -31,20 +31,24 @@ interface Options {
   onTileError: (failing: boolean) => void;
 }
 
+/**
+ * Callbacks only, plus the container ref.
+ *
+ * The Leaflet instance itself is deliberately not exposed: reading it during
+ * render would be reading a ref during render, which React forbids because the
+ * value is not part of the render output. Anything that needs the map operates
+ * through these methods, which run in effects and event handlers.
+ */
 export interface LeafletHandle {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  map: L.Map | null;
   zoomIn: () => void;
   zoomOut: () => void;
-  flyTo: (position: MapPosition) => void;
-  fitBounds: (bounds: L.LatLngBoundsExpression) => void;
 }
 
 export function useLeafletMap(options: Options): LeafletHandle {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
-  const [, forceRender] = useState(0);
 
   // Latest callbacks without re-running the init effect.
   const callbacks = useRef(options);
@@ -84,8 +88,6 @@ export function useLeafletMap(options: Options): LeafletHandle {
       map.invalidateSize({ animate: false });
     });
     observer.observe(container);
-
-    forceRender((n) => n + 1);
 
     return () => {
       observer.disconnect();
@@ -139,16 +141,13 @@ export function useLeafletMap(options: Options): LeafletHandle {
     };
   }, [options.providerId]);
 
-  return {
-    containerRef,
-    map: mapRef.current,
-    zoomIn: () => mapRef.current?.zoomIn(),
-    zoomOut: () => mapRef.current?.zoomOut(),
-    flyTo: (position) =>
-      mapRef.current?.flyTo([position.lat, position.lon], position.zoom, {
-        duration: 0.6,
-      }),
-    fitBounds: (bounds) =>
-      mapRef.current?.fitBounds(bounds, { padding: [48, 48] }),
-  };
+  // Stable across renders, so effects that depend on the handle do not re-run.
+  return useMemo<LeafletHandle>(
+    () => ({
+      containerRef,
+      zoomIn: () => mapRef.current?.zoomIn(),
+      zoomOut: () => mapRef.current?.zoomOut(),
+    }),
+    [],
+  );
 }

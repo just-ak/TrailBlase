@@ -151,10 +151,11 @@ describe('folderService', () => {
 
 // -------------------------------------------------------------------- trips
 
-describe('tripService', () => {
-  const newTrip = (name: string, folderId: string | null = null) =>
-    tripService.create(db, { name, folderId, description: null, notes: null }).result;
+const newTrip = (name: string, folderId: string | null = null) =>
+  tripService.create(db, { name, folderId, description: null, notes: null })
+    .result;
 
+describe('tripService', () => {
   it('creates a trip with timestamps and active status', () => {
     const trip = newTrip('Dolomites');
     expect(trip.name).toBe('Dolomites');

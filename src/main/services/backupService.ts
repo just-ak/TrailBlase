@@ -45,7 +45,7 @@ export function listBackups(backupsDir: string): BackupEntry[] {
         byteSize: stat.size,
       };
     })
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .toSorted((a, b) => b.createdAt - a.createdAt);
 }
 
 /**

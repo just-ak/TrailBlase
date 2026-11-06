@@ -33,10 +33,21 @@ This project targets **Node.js 26 (LTS "Lithium")**, pinned in `.nvmrc` and in
 - CI and local development use the same major.
 
 Host Node only drives build tooling and tests. The Electron main and renderer
-processes run the Node bundled with Electron, so native modules are compiled
-for the **Electron ABI**, not the host ABI. After installing or updating a
-native dependency, rebuild it for Electron (`@electron/rebuild`) rather than
-assuming host prebuilds apply.
+processes run the Node bundled with Electron (24.22.2, modules ABI 150 for
+Electron 45), so a native module compiled against the host ABI will not
+necessarily load. `postinstall` runs `electron-builder install-app-deps` for
+exactly this reason.
+
+One correction to the usual advice: `better-sqlite3` 13 is **N-API** based, and
+N-API is ABI-stable across Node and Electron, so it needs no Electron-specific
+rebuild. Do not assume that of the next native dependency. Verify instead —
+`npm run verify:native` runs a real SQLite round trip inside Electron, which is
+the only check that can actually prove it. See ADR 0010.
+
+Electron 45 ships no postinstall script and downloads its binary lazily on first
+`require('electron')`. `postinstall` therefore runs `install-electron`
+explicitly, so a clean install is deterministic rather than deferring a ~130 MB
+download to an arbitrary later command.
 
 ## Package manager
 
