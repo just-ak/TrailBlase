@@ -1,38 +1,25 @@
 # Third-party dependency and licence register
 
-Required by the project licensing policy and by ADR 0007. The application
-is licensed GPL-3.0-or-later; every entry here must be inbound-compatible
-with that.
+Required by the project licensing policy and by ADR 0007. The application is
+licensed GPL-3.0-or-later; every entry here must be inbound-compatible with that.
 
-Generated 2026-11-05 from a clean install of the full
-dependency set on Node 26.13.0. Packages examined: **369**.
+**GENERATED FILE** — regenerate with `npm run licences`.
 
-Regenerate whenever dependencies change. See
-`.kiro/steering/licensing.md` for the procedure and the rules.
-
-## Compatibility summary
-
-| Verdict | Count |
-| --- | --- |
-| Compatible with GPL-3.0 | 369 |
-
-No package in the tree is incompatible with GPL-3.0, and none requires a
-further decision.
+Generated 2026-11-05 from the installed dependency tree
+on Node v26.13.0. Packages examined: **355**. Incompatibilities: **0**.
 
 ## Licence distribution
 
 | Licence | Packages |
 | --- | --- |
-| MIT | 293 |
+| MIT | 282 |
 | ISC | 26 |
-| Apache-2.0 | 15 |
-| BSD-3-Clause | 11 |
-| BSD-2-Clause | 7 |
+| Apache-2.0 | 16 |
+| BSD-3-Clause | 10 |
 | BlueOak-1.0.0 | 6 |
+| BSD-2-Clause | 6 |
 | MPL-2.0 | 2 |
-| (MIT AND Zlib) | 1 |
 | (MIT OR CC0-1.0) | 1 |
-| (MIT OR GPL-3.0-or-later) | 1 |
 | (WTFPL OR MIT) | 1 |
 | 0BSD | 1 |
 | CC-BY-4.0 | 1 |
@@ -42,61 +29,32 @@ further decision.
 
 ## Shipped in the application bundle
 
-These are distributed to users, so their licences bind the combined work.
+Distributed to users, so these licences bind the combined work.
 
-| Package | Version | Licence | GPL-3.0 compatible |
-| --- | --- | --- | --- |
-| `@tmcw/togeojson` | 7.1.3 | BSD-2-Clause | Yes |
-| `better-sqlite3` | 13.0.3 | MIT | Yes |
-| `drizzle-orm` | 0.45.4 | Apache-2.0 | Yes |
-| `electron` | 45.2.3 | MIT | Yes |
-| `fast-xml-parser` | 5.12.0 | MIT | Yes |
-| `fit-file-parser` | 6.2.7 | MIT | Yes |
-| `jszip` | 3.10.2 | (MIT OR GPL-3.0-or-later) | Yes |
-| `leaflet` | 1.9.4 | BSD-2-Clause | Yes |
-| `react` | 19.3.1 | MIT | Yes |
-| `react-dom` | 19.3.1 | MIT | Yes |
-| `zod` | 4.6.7 | MIT | Yes |
-| `zustand` | 5.0.16 | MIT | Yes |
-
-Chromium and Node.js reach users via Electron. Electron is MIT; Chromium is
-BSD-3-Clause with LGPL components; Node.js is MIT. All are compatible, and
-Electron ships its own notices which must be reproduced in the About window.
-
-## Build and development only
-
-Not distributed, so these do not bind the combined work. Recorded for
-completeness and to catch anything that would restrict contribution.
-
-| Package | Version | Licence | GPL-3.0 compatible |
-| --- | --- | --- | --- |
-| `@electron/rebuild` | 4.2.1 | MIT | Yes |
-| `@tailwindcss/vite` | 4.3.4 | MIT | Yes |
-| `@vitejs/plugin-react` | 6.2.1 | MIT | Yes |
-| `@vitest/coverage-v8` | 5.1.0 | MIT | Yes |
-| `drizzle-kit` | 0.31.11 | MIT | Yes |
-| `electron-builder` | 26.18.0 | MIT | Yes |
-| `electron-vite` | 6.0.0 | MIT | Yes |
-| `oxlint` | 1.91.0 | MIT | Yes |
-| `playwright` | 1.65.0 | Apache-2.0 | Yes |
-| `tailwindcss` | 4.3.4 | MIT | Yes |
-| `typescript` | 7.0.2 | Apache-2.0 | Yes |
-| `vite` | 8.3.6 | MIT | Yes |
-| `vitest` | 5.1.0 | MIT | Yes |
+| Package | Version | Licence |
+| --- | --- | --- |
+| `better-sqlite3` | 13.0.3 | MIT |
+| `drizzle-orm` | 0.45.4 | Apache-2.0 |
+| `electron` | 45.2.3 | MIT |
+| `leaflet` | 1.9.4 | BSD-2-Clause |
+| `react` | 19.3.1 | MIT |
+| `react-dom` | 19.3.1 | MIT |
+| `zod` | 4.6.7 | MIT |
+| `zustand` | 5.0.16 | MIT |
+| Chromium | bundled with Electron | BSD-3-Clause and others |
+| Node.js | bundled with Electron | MIT |
 
 ## Rejected on licence grounds
 
 | Package | Licence | Reason | Replacement |
 | --- | --- | --- | --- |
-| `react-leaflet` | Hippocratic-2.1 | Use restrictions and indemnity obligation are further restrictions GPL-3.0 §7 forbids; not OSI-approved | Leaflet used directly, ADR 0008 |
-| `@react-leaflet/core` | Hippocratic-2.1 | As above, transitive dependency of the above | — |
-| `@garmin/fitsdk` | Proprietary FIT Protocol License Agreement | Bilateral EULA requiring acceptance; not open source, cannot combine with GPL-3.0 | `fit-file-parser` (MIT), ADR 0006 |
-| GPSBabel (bundling) | GPL-2.0-or-later | Not rejected. Compatible with GPL-3.0 and now permitted; retained here as a note that it was previously excluded under ADR 0006 | — |
+| `react-leaflet` | Hippocratic-2.1 | Use restrictions and an indemnity obligation are further restrictions GPL-3.0 §7 forbids; not OSI-approved | Leaflet used directly, ADR 0008 |
+| `@garmin/fitsdk` | Proprietary FIT Protocol License Agreement | Bilateral EULA; not open source, cannot combine with GPL-3.0 | `fit-file-parser` (MIT), ADR 0006 |
 
 ## Full dependency list
 
 <details>
-<summary>All 369 packages</summary>
+<summary>All 355 packages</summary>
 
 | Package | Version | Licence |
 | --- | --- | --- |
@@ -145,13 +103,13 @@ completeness and to catch anything that would restrict contribution.
 | `@malept/flatpak-bundler` | 0.4.0 | MIT |
 | `@napi-rs/wasm-runtime` | 1.2.2 | MIT |
 | `@noble/hashes` | 1.8.0 | MIT |
-| `@nodable/entities` | 3.1.0 | MIT |
 | `@oxc-project/types` | 0.156.0 | MIT |
 | `@oxlint/binding-darwin-arm64` | 1.91.0 | MIT |
 | `@peculiar/asn1-schema` | 2.11.1 | MIT |
 | `@peculiar/json-schema` | 1.1.12 | MIT |
 | `@peculiar/utils` | 2.0.3 | MIT |
 | `@peculiar/webcrypto` | 1.7.2 | MIT |
+| `@playwright/test` | 1.65.0 | Apache-2.0 |
 | `@rolldown/binding-darwin-arm64` | 1.2.16 | MIT |
 | `@rolldown/pluginutils` | 1.0.1 | MIT |
 | `@sindresorhus/is` | 4.6.0 | MIT |
@@ -161,7 +119,6 @@ completeness and to catch anything that would restrict contribution.
 | `@tailwindcss/oxide-darwin-arm64` | 4.3.4 | MIT |
 | `@tailwindcss/oxide-wasm32-wasi` | 4.3.4 | MIT |
 | `@tailwindcss/vite` | 4.3.4 | MIT |
-| `@tmcw/togeojson` | 7.1.3 | BSD-2-Clause |
 | `@tybys/wasm-util` | 0.10.3 | MIT |
 | `@types/better-sqlite3` | 9.6.0 | MIT |
 | `@types/cacheable-request` | 6.0.3 | MIT |
@@ -176,6 +133,8 @@ completeness and to catch anything that would restrict contribution.
 | `@types/leaflet` | 1.9.22 | MIT |
 | `@types/ms` | 2.1.0 | MIT |
 | `@types/node` | 24.19.2 | MIT |
+| `@types/react` | 19.3.0 | MIT |
+| `@types/react-dom` | 19.3.0 | MIT |
 | `@types/responselike` | 1.0.3 | MIT |
 | `@typescript/typescript-darwin-arm64` | 7.0.2 | Apache-2.0 |
 | `@vitejs/plugin-react` | 6.2.1 | MIT |
@@ -190,7 +149,6 @@ completeness and to catch anything that would restrict contribution.
 | `ajv` | 8.20.0 | MIT |
 | `ansi-regex` | 5.0.1 | MIT |
 | `ansi-styles` | 4.3.0 | MIT |
-| `anynum` | 1.0.1 | MIT |
 | `app-builder-lib` | 26.18.0 | MIT |
 | `argparse` | 2.0.1 | Python-2.0 |
 | `asn1js` | 3.1.0 | BSD-3-Clause |
@@ -209,7 +167,6 @@ completeness and to catch anything that would restrict contribution.
 | `boolean` | 3.2.0 | MIT |
 | `brace-expansion` | 1.1.21 | MIT |
 | `browserslist` | 4.29.5 | MIT |
-| `buffer` | 6.0.3 | MIT |
 | `buffer-from` | 1.1.2 | MIT |
 | `builder-util` | 26.16.0 | MIT |
 | `builder-util-runtime` | 9.7.0 | MIT |
@@ -236,6 +193,7 @@ completeness and to catch anything that would restrict contribution.
 | `core-util-is` | 1.0.3 | MIT |
 | `cross-dirname` | 0.1.0 | MIT |
 | `cross-spawn` | 7.0.6 | MIT |
+| `csstype` | 3.2.3 | MIT |
 | `debug` | 4.4.3 | MIT |
 | `decompress-response` | 6.0.0 | MIT |
 | `defer-to-connect` | 2.0.1 | MIT |
@@ -279,15 +237,11 @@ completeness and to catch anything that would restrict contribution.
 | `exponential-backoff` | 3.1.3 | Apache-2.0 |
 | `fast-deep-equal` | 3.1.3 | MIT |
 | `fast-uri` | 3.1.9 | BSD-3-Clause |
-| `fast-xml-builder` | 1.3.1 | MIT |
-| `fast-xml-parser` | 5.12.0 | MIT |
 | `fdir` | 6.5.0 | MIT |
 | `filelist` | 1.0.6 | Apache-2.0 |
-| `fit-file-parser` | 6.2.7 | MIT |
 | `form-data` | 4.0.6 | MIT |
 | `fs-extra` | 11.3.1 | MIT |
 | `fs.realpath` | 1.0.0 | ISC |
-| `fsevents` | 2.3.3 | MIT |
 | `function-bind` | 1.1.2 | MIT |
 | `gensync` | 1.0.0-beta.2 | MIT |
 | `get-caller-file` | 2.0.5 | ISC |
@@ -311,12 +265,9 @@ completeness and to catch anything that would restrict contribution.
 | `http-proxy-agent` | 7.0.2 | MIT |
 | `http2-wrapper` | 1.0.3 | MIT |
 | `https-proxy-agent` | 7.0.6 | MIT |
-| `ieee754` | 1.2.1 | BSD-3-Clause |
-| `immediate` | 3.0.6 | MIT |
 | `inflight` | 1.0.6 | ISC |
 | `inherits` | 2.0.4 | ISC |
 | `is-fullwidth-code-point` | 3.0.0 | MIT |
-| `is-unsafe` | 2.0.3 | MIT |
 | `isarray` | 1.0.0 | MIT |
 | `isbinaryfile` | 5.0.7 | MIT |
 | `isexe` | 4.0.0 | BlueOak-1.0.0 |
@@ -330,11 +281,9 @@ completeness and to catch anything that would restrict contribution.
 | `json-stringify-safe` | 5.0.1 | ISC |
 | `json5` | 2.2.3 | MIT |
 | `jsonfile` | 6.2.1 | MIT |
-| `jszip` | 3.10.2 | (MIT OR GPL-3.0-or-later) |
 | `keyv` | 4.5.4 | MIT |
 | `lazy-val` | 1.0.5 | MIT |
 | `leaflet` | 1.9.4 | BSD-2-Clause |
-| `lie` | 3.3.0 | MIT |
 | `lightningcss` | 1.33.0 | MPL-2.0 |
 | `lightningcss-darwin-arm64` | 1.33.0 | MPL-2.0 |
 | `lodash` | 4.18.1 | MIT |
@@ -369,8 +318,6 @@ completeness and to catch anything that would restrict contribution.
 | `oxlint` | 1.91.0 | MIT |
 | `p-cancelable` | 2.1.1 | MIT |
 | `p-limit` | 3.1.0 | MIT |
-| `pako` | 1.0.11 | (MIT AND Zlib) |
-| `path-expression-matcher` | 1.6.2 | MIT |
 | `path-is-absolute` | 1.0.1 | MIT |
 | `path-key` | 3.1.1 | MIT |
 | `pe-library` | 0.4.1 | MIT |
@@ -412,7 +359,6 @@ completeness and to catch anything that would restrict contribution.
 | `semver` | 5.7.3 | ISC |
 | `semver-compare` | 1.0.0 | MIT |
 | `serialize-error` | 7.0.1 | MIT |
-| `setimmediate` | 1.0.5 | MIT |
 | `shebang-command` | 2.0.0 | MIT |
 | `shebang-regex` | 3.0.0 | MIT |
 | `signal-exit` | 3.0.7 | ISC |
@@ -426,7 +372,6 @@ completeness and to catch anything that would restrict contribution.
 | `string-width` | 4.2.3 | MIT |
 | `string_decoder` | 1.1.1 | MIT |
 | `strip-ansi` | 6.0.1 | MIT |
-| `strnum` | 2.5.1 | MIT |
 | `sumchecker` | 3.0.1 | Apache-2.0 |
 | `supports-color` | 7.2.0 | MIT |
 | `tailwindcss` | 4.3.4 | MIT |
@@ -460,7 +405,6 @@ completeness and to catch anything that would restrict contribution.
 | `why-is-node-running` | 3.2.1 | MIT |
 | `wrap-ansi` | 7.0.0 | MIT |
 | `wrappy` | 1.0.2 | ISC |
-| `xml-naming` | 0.3.0 | MIT |
 | `xmlbuilder` | 15.1.1 | MIT |
 | `y18n` | 5.0.8 | ISC |
 | `yallist` | 3.1.1 | ISC |

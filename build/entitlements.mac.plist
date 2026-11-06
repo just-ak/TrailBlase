@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Required by Electron itself: the renderer's JavaScript engine needs JIT.
+  -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <!--
+    Required for ad-hoc signing (mac.identity: "-") to coexist with Electron's
+    Apple-signed frameworks. An ad-hoc signature carries no Team ID, which
+    mismatches the frameworks and aborts launch with a "different Team IDs"
+    error unless library validation is disabled.
+
+    Keep this entitlement when a Developer ID arrives — it is harmless for a
+    properly signed build and removing it is a separate decision. See ADR 0009.
+  -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>

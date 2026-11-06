@@ -1,0 +1,21 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
+# macOS
+.DS_Store
+
+# Local env / signing material — never commit
+.env
+.env.local
+*.p12
+*.mobileprovision

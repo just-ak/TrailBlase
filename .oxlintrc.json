@@ -1,0 +1,86 @@
+{
+  "plugins": ["react", "typescript", "unicorn", "oxc"],
+  "env": { "es2024": true, "browser": true, "node": true },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn"
+  },
+  "rules": {
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-console": "off",
+    "no-debugger": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": "error",
+    "unicorn/prefer-node-protocol": "error"
+  },
+  "overrides": [
+    {
+      "files": ["src/shared/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["electron", "electron/*", "node:*", "react", "react-dom", "better-sqlite3", "drizzle-orm", "leaflet", "@main/*", "@renderer/*", "@preload/*"],
+                "message": "src/shared must stay dependency-free so both processes and unit tests can import it. See .kiro/steering/architecture.md."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/renderer/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["electron", "node:*", "better-sqlite3", "drizzle-orm", "@main/*", "fs", "path"],
+                "message": "The renderer has no system access. Go through the preload bridge. See .kiro/steering/architecture.md."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/renderer/features/map/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@renderer/features/library/*", "@renderer/features/properties/*"],
+                "message": "Map rendering must not depend on trip management. Compose them at the app layer."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/main/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["react", "react-dom", "@renderer/*", "leaflet"],
+                "message": "The main process must not import renderer or UI code."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "ignorePatterns": ["out/**", "dist/**", "release/**", "coverage/**", "node_modules/**"]
+}

@@ -1,0 +1,37 @@
+appId: com.trailrt.app
+productName: TrailRT
+copyright: Copyright (C) 2026 TrailRT contributors. Licensed under GPL-3.0-or-later.
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**
+  - package.json
+  - LICENSE
+
+# better-sqlite3 is a native module and must not be packed into the asar.
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+
+mac:
+  category: public.app-category.healthcare-fitness
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Ad-hoc signing: no Developer ID is available yet. See ADR 0009.
+  # When one is obtained, replace "-" with the certificate name (or let
+  # electron-builder auto-discover it) and enable notarize below. The
+  # entitlements and hardened runtime settings do not change.
+  identity: '-'
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  gatekeeperAssess: false
+  # notarize: true   <- requires a Developer ID and APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID
+  notarize: false
+  # No "mas" target. The Mac App Store terms conflict with GPL-3.0. See ADR 0007.
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.dmg
