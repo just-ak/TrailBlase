@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  No <ele> anywhere. Every elevation must import as null, and derived gain and
+  loss must be null rather than 0. "Flat" and "unknown" are different facts.
+-->
+<gpx version="1.1" creator="TrailRT test fixture" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="45.9763" lon="7.6586">
+    <name>Unknown Height</name>
+  </wpt>
+  <rte>
+    <name>Flat Unknown</name>
+    <rtept lat="45.9763" lon="7.6586"/>
+    <rtept lat="45.9800" lon="7.6650"/>
+  </rte>
+  <trk>
+    <name>No Heights</name>
+    <trkseg>
+      <trkpt lat="45.9763" lon="7.6586">
+        <time>2026-08-01T05:00:00Z</time>
+      </trkpt>
+      <trkpt lat="45.9800" lon="7.6650">
+        <time>2026-08-01T05:30:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

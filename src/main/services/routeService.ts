@@ -89,6 +89,8 @@ export function create(
     points: readonly RoutePoint[];
     source?: 'user' | 'import';
     id?: string;
+    /** Imported fields with no column of their own. See db/metadata.ts. */
+    metadata?: Record<string, unknown> | undefined;
   },
 ): Mutation<Route> {
   assertTripExists(db, input.tripId);
@@ -101,6 +103,7 @@ export function create(
       name: input.name,
       colour: input.colour,
       source: input.source ?? 'user',
+      metadata: input.metadata,
       now,
     });
     repo.replacePoints(db, route.id, input.points);

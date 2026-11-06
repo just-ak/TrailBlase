@@ -28,11 +28,15 @@
     "verify:native": "electron scripts/verify-native.mjs",
     "licences": "node scripts/generate-licences.mjs",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
-    "licences:check": "node scripts/generate-licences.mjs"
+    "licences:check": "node scripts/generate-licences.mjs",
+    "fixtures": "node scripts/generate-fixtures.mjs"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",
-    "drizzle-orm": "0.45.4"
+    "drizzle-orm": "0.45.4",
+    "fast-xml-parser": "^5.12.0",
+    "fit-file-parser": "^6.2.7",
+    "jszip": "^3.10.2"
   },
   "devDependencies": {
     "@electron/rebuild": "4.2.1",
@@ -66,6 +70,7 @@
     "esbuild@0.28.2": true,
     "esbuild@0.25.12": true,
     "esbuild@0.18.20": true,
-    "electron-winstaller": false
+    "electron-winstaller": false,
+    "fsevents@2.3.3": true
   }
 }

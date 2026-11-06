@@ -6,20 +6,22 @@ licensed GPL-3.0-or-later; every entry here must be inbound-compatible with that
 **GENERATED FILE** — regenerate with `npm run licences`.
 
 Generated 2026-11-06 from the installed dependency tree
-on Node v26.13.0. Packages examined: **355**. Incompatibilities: **0**.
+on Node v26.13.0. Packages examined: **372**. Incompatibilities: **0**.
 
 ## Licence distribution
 
 | Licence | Packages |
 | --- | --- |
-| MIT | 282 |
+| MIT | 296 |
 | ISC | 26 |
 | Apache-2.0 | 16 |
-| BSD-3-Clause | 10 |
+| BSD-3-Clause | 11 |
 | BlueOak-1.0.0 | 6 |
 | BSD-2-Clause | 6 |
 | MPL-2.0 | 2 |
+| (MIT AND Zlib) | 1 |
 | (MIT OR CC0-1.0) | 1 |
+| (MIT OR GPL-3.0-or-later) | 1 |
 | (WTFPL OR MIT) | 1 |
 | 0BSD | 1 |
 | CC-BY-4.0 | 1 |
@@ -54,7 +56,7 @@ Distributed to users, so these licences bind the combined work.
 ## Full dependency list
 
 <details>
-<summary>All 355 packages</summary>
+<summary>All 372 packages</summary>
 
 | Package | Version | Licence |
 | --- | --- | --- |
@@ -103,6 +105,7 @@ Distributed to users, so these licences bind the combined work.
 | `@malept/flatpak-bundler` | 0.4.0 | MIT |
 | `@napi-rs/wasm-runtime` | 1.2.2 | MIT |
 | `@noble/hashes` | 1.8.0 | MIT |
+| `@nodable/entities` | 3.1.0 | MIT |
 | `@oxc-project/types` | 0.156.0 | MIT |
 | `@oxlint/binding-darwin-arm64` | 1.91.0 | MIT |
 | `@peculiar/asn1-schema` | 2.11.1 | MIT |
@@ -149,6 +152,7 @@ Distributed to users, so these licences bind the combined work.
 | `ajv` | 8.20.0 | MIT |
 | `ansi-regex` | 5.0.1 | MIT |
 | `ansi-styles` | 4.3.0 | MIT |
+| `anynum` | 1.0.1 | MIT |
 | `app-builder-lib` | 26.18.0 | MIT |
 | `argparse` | 2.0.1 | Python-2.0 |
 | `asn1js` | 3.1.0 | BSD-3-Clause |
@@ -167,6 +171,7 @@ Distributed to users, so these licences bind the combined work.
 | `boolean` | 3.2.0 | MIT |
 | `brace-expansion` | 1.1.21 | MIT |
 | `browserslist` | 4.29.5 | MIT |
+| `buffer` | 6.0.3 | MIT |
 | `buffer-from` | 1.1.2 | MIT |
 | `builder-util` | 26.16.0 | MIT |
 | `builder-util-runtime` | 9.7.0 | MIT |
@@ -237,11 +242,15 @@ Distributed to users, so these licences bind the combined work.
 | `exponential-backoff` | 3.1.3 | Apache-2.0 |
 | `fast-deep-equal` | 3.1.3 | MIT |
 | `fast-uri` | 3.1.9 | BSD-3-Clause |
+| `fast-xml-builder` | 1.3.1 | MIT |
+| `fast-xml-parser` | 5.12.0 | MIT |
 | `fdir` | 6.5.0 | MIT |
 | `filelist` | 1.0.6 | Apache-2.0 |
+| `fit-file-parser` | 6.2.7 | MIT |
 | `form-data` | 4.0.6 | MIT |
 | `fs-extra` | 11.3.1 | MIT |
 | `fs.realpath` | 1.0.0 | ISC |
+| `fsevents` | 2.3.3 | MIT |
 | `function-bind` | 1.1.2 | MIT |
 | `gensync` | 1.0.0-beta.2 | MIT |
 | `get-caller-file` | 2.0.5 | ISC |
@@ -265,9 +274,12 @@ Distributed to users, so these licences bind the combined work.
 | `http-proxy-agent` | 7.0.2 | MIT |
 | `http2-wrapper` | 1.0.3 | MIT |
 | `https-proxy-agent` | 7.0.6 | MIT |
+| `ieee754` | 1.2.1 | BSD-3-Clause |
+| `immediate` | 3.0.6 | MIT |
 | `inflight` | 1.0.6 | ISC |
 | `inherits` | 2.0.4 | ISC |
 | `is-fullwidth-code-point` | 3.0.0 | MIT |
+| `is-unsafe` | 2.0.3 | MIT |
 | `isarray` | 1.0.0 | MIT |
 | `isbinaryfile` | 5.0.7 | MIT |
 | `isexe` | 4.0.0 | BlueOak-1.0.0 |
@@ -281,9 +293,11 @@ Distributed to users, so these licences bind the combined work.
 | `json-stringify-safe` | 5.0.1 | ISC |
 | `json5` | 2.2.3 | MIT |
 | `jsonfile` | 6.2.1 | MIT |
+| `jszip` | 3.10.2 | (MIT OR GPL-3.0-or-later) |
 | `keyv` | 4.5.4 | MIT |
 | `lazy-val` | 1.0.5 | MIT |
 | `leaflet` | 1.9.4 | BSD-2-Clause |
+| `lie` | 3.3.0 | MIT |
 | `lightningcss` | 1.33.0 | MPL-2.0 |
 | `lightningcss-darwin-arm64` | 1.33.0 | MPL-2.0 |
 | `lodash` | 4.18.1 | MIT |
@@ -318,6 +332,8 @@ Distributed to users, so these licences bind the combined work.
 | `oxlint` | 1.91.0 | MIT |
 | `p-cancelable` | 2.1.1 | MIT |
 | `p-limit` | 3.1.0 | MIT |
+| `pako` | 1.0.11 | (MIT AND Zlib) |
+| `path-expression-matcher` | 1.6.2 | MIT |
 | `path-is-absolute` | 1.0.1 | MIT |
 | `path-key` | 3.1.1 | MIT |
 | `pe-library` | 0.4.1 | MIT |
@@ -359,6 +375,7 @@ Distributed to users, so these licences bind the combined work.
 | `semver` | 5.7.3 | ISC |
 | `semver-compare` | 1.0.0 | MIT |
 | `serialize-error` | 7.0.1 | MIT |
+| `setimmediate` | 1.0.5 | MIT |
 | `shebang-command` | 2.0.0 | MIT |
 | `shebang-regex` | 3.0.0 | MIT |
 | `signal-exit` | 3.0.7 | ISC |
@@ -372,6 +389,7 @@ Distributed to users, so these licences bind the combined work.
 | `string-width` | 4.2.3 | MIT |
 | `string_decoder` | 1.1.1 | MIT |
 | `strip-ansi` | 6.0.1 | MIT |
+| `strnum` | 2.5.1 | MIT |
 | `sumchecker` | 3.0.1 | Apache-2.0 |
 | `supports-color` | 7.2.0 | MIT |
 | `tailwindcss` | 4.3.4 | MIT |
@@ -405,6 +423,7 @@ Distributed to users, so these licences bind the combined work.
 | `why-is-node-running` | 3.2.1 | MIT |
 | `wrap-ansi` | 7.0.0 | MIT |
 | `wrappy` | 1.0.2 | ISC |
+| `xml-naming` | 0.3.0 | MIT |
 | `xmlbuilder` | 15.1.1 | MIT |
 | `y18n` | 5.0.8 | ISC |
 | `yallist` | 3.1.1 | ISC |

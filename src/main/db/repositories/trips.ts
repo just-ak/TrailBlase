@@ -7,6 +7,7 @@ import type {
   TripWithCounts,
 } from '@shared/domain/types';
 import type { Db } from '../client';
+import { encodeMetadata } from '../metadata';
 import { trips } from '../schema';
 
 export function rowToTrip(row: typeof trips.$inferSelect): Trip {
@@ -129,6 +130,8 @@ export interface InsertTripValues {
   description: string | null;
   notes: string | null;
   status?: TripStatus;
+  /** Imported fields with no column of their own. See db/metadata.ts. */
+  metadata?: Record<string, unknown> | undefined;
   now: number;
 }
 
@@ -141,6 +144,7 @@ export function insertTrip(db: Db, values: InsertTripValues): Trip {
       description: values.description,
       notes: values.notes,
       status: values.status ?? 'active',
+      metadata: encodeMetadata(values.metadata),
       createdAt: values.now,
       updatedAt: values.now,
     })

@@ -73,6 +73,8 @@ export function create(
     notes: string | null;
     groupId: string | null;
     source?: 'user' | 'import';
+    /** Imported fields with no column of their own. See db/metadata.ts. */
+    metadata?: Record<string, unknown> | undefined;
   },
 ): Mutation<Waypoint> {
   assertTripExists(db, input.tripId);
@@ -91,6 +93,7 @@ export function create(
     symbol: input.symbol.length === 0 ? DEFAULT_SYMBOL_ID : input.symbol,
     notes: input.notes,
     source: input.source ?? 'user',
+    metadata: input.metadata,
     now: Date.now(),
   });
 

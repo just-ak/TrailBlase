@@ -5,6 +5,8 @@ import type {
   PanelLayout,
   ThemePreference,
 } from '@shared/domain/types';
+import type { StagedImport } from '@shared/ipc/api';
+import type { ExportScopeRequest } from '@shared/ipc/schemas';
 import { api, callOr } from '../lib/client';
 
 /**
@@ -23,7 +25,10 @@ export type DialogKind =
       kind: 'confirmDelete';
       target: { type: 'trip' | 'folder'; id: string; name: string };
       counts: Record<string, number>;
-    };
+    }
+  /** Files already parsed and staged in the main process, awaiting confirmation. */
+  | { kind: 'import'; staged: StagedImport[] }
+  | { kind: 'export'; scope: ExportScopeRequest };
 
 interface UiState {
   layout: PanelLayout;

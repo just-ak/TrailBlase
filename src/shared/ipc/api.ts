@@ -3,6 +3,9 @@ import type {
   Folder,
   Route,
   RouteWithPoints,
+  Track,
+  TrackGeometry,
+  TrackWithPoints,
   Trip,
   TreeNode,
   TripGeometry,
@@ -11,6 +14,14 @@ import type {
   Waypoint,
   WaypointGroup,
 } from '../domain/types';
+import type {
+  ExportFormat,
+  ImportFormat,
+  ImportHistoryEntry,
+  ImportProgress,
+  ImportReport,
+  SkippedItem,
+} from '../io/types';
 import type { MenuAction } from './channels';
 import type { Result } from './result';
 import type * as S from './schemas';
@@ -145,6 +156,74 @@ export interface TrailRtApi {
       req: Req<typeof S.waypointCreateGroupRequest>,
     ): Promise<Result<WaypointGroup>>;
   };
+  tracks: {
+    listForTrip(
+      req: Req<typeof S.trackListForTripRequest>,
+    ): Promise<Result<Track[]>>;
+    listAll(): Promise<Result<TrackWithTrip[]>>;
+    get(req: Req<typeof S.trackGetRequest>): Promise<Result<TrackWithPoints>>;
+    /** Simplified or exact, depending on zoom. The response says which. */
+    geometry(
+      req: Req<typeof S.trackGeometryRequest>,
+    ): Promise<Result<TrackGeometry>>;
+    update(req: Req<typeof S.trackUpdateRequest>): Promise<Result<Track>>;
+    move(req: Req<typeof S.trackMoveRequest>): Promise<Result<Track>>;
+    reverse(
+      req: Req<typeof S.trackReverseRequest>,
+    ): Promise<Result<TrackWithPoints>>;
+    /** The resulting point count, so the user sees it before applying. */
+    previewSimplify(
+      req: Req<typeof S.trackPreviewSimplifyRequest>,
+    ): Promise<Result<{ before: number; after: number }>>;
+    simplify(
+      req: Req<typeof S.trackSimplifyRequest>,
+    ): Promise<Result<TrackWithPoints>>;
+    split(
+      req: Req<typeof S.trackSplitRequest>,
+    ): Promise<Result<{ first: TrackWithPoints; second: TrackWithPoints }>>;
+    join(
+      req: Req<typeof S.trackJoinRequest>,
+    ): Promise<Result<TrackWithPoints>>;
+    deleteRange(
+      req: Req<typeof S.trackDeleteRangeRequest>,
+    ): Promise<Result<TrackWithPoints>>;
+    delete(
+      req: Req<typeof S.trackDeleteRequest>,
+    ): Promise<Result<{ id: string }>>;
+    hasOriginal(
+      req: Req<typeof S.trackHasOriginalRequest>,
+    ): Promise<Result<{ hasOriginal: boolean; format: string | null }>>;
+    restoreOriginal(
+      req: Req<typeof S.trackRestoreOriginalRequest>,
+    ): Promise<Result<TrackWithPoints>>;
+  };
+  importing: {
+    /** Opens the file dialog in the main process and stages what was chosen. */
+    choose(): Promise<Result<StagedImport[]>>;
+    /**
+     * Stages files from a drag-and-drop.
+     *
+     * Takes `File` objects, not paths: the bridge resolves them with
+     * `webUtils.getPathForFile`, so the renderer never constructs a path.
+     */
+    addDroppedFiles(files: readonly File[]): Promise<Result<StagedImport[]>>;
+    commit(
+      req: Req<typeof S.importCommitRequest>,
+    ): Promise<Result<ImportReport[]>>;
+    discard(req: Req<typeof S.importDiscardRequest>): Promise<Result<true>>;
+    history(
+      req: Req<typeof S.importHistoryRequest>,
+    ): Promise<Result<ImportHistoryEntry[]>>;
+    clearHistory(): Promise<Result<{ removed: number }>>;
+  };
+  exporting: {
+    /** Every writable format for a scope, each with its own loss list. */
+    options(
+      req: Req<typeof S.exportOptionsRequest>,
+    ): Promise<Result<ExportFormatOption[]>>;
+    /** Shows the save dialog and writes. Returns what happened, not a path. */
+    run(req: Req<typeof S.exportRunRequest>): Promise<Result<ExportOutcome>>;
+  };
   geometry: {
     forTrip(
       req: Req<typeof S.geometryForTripRequest>,
@@ -167,7 +246,60 @@ export interface TrailRtApi {
     onThemeChanged(listener: (isDark: boolean) => void): () => void;
     onLibraryChanged(listener: () => void): () => void;
     onUndoStateChanged(listener: (state: UndoState) => void): () => void;
+    onImportProgress(
+      listener: (progress: ImportProgress) => void,
+    ): () => void;
   };
+}
+
+/**
+ * A file staged for import.
+ *
+ * `token` is opaque and `sourceName` is a basename: between them the renderer
+ * can label the file and confirm the import without ever holding a path.
+ */
+export interface StagedImport {
+  token: string;
+  sourceName: string;
+  preview: StagedPreview | null;
+  /** Set when the file could not be parsed. Listed rather than hidden. */
+  error: { message: string; detail?: string } | null;
+}
+
+export interface StagedPreview {
+  sourceName: string;
+  format: ImportFormat;
+  counts: { routes: number; tracks: number; waypoints: number; points: number };
+  routeNames: string[];
+  trackNames: string[];
+  waypointNames: string[];
+  skipped: SkippedItem[];
+  warnings: string[];
+  unmappedMetadata: string[];
+}
+
+export interface ExportFormatOption {
+  format: ExportFormat;
+  label: string;
+  extension: string;
+  suggestedName: string;
+  willWrite: { routes: number; tracks: number; waypoints: number };
+  omitted: { routes: number; tracks: number; waypoints: number };
+  /** Named losses, shown before the write rather than discovered after it. */
+  losses: string[];
+  empty: boolean;
+}
+
+export interface ExportOutcome {
+  cancelled: boolean;
+  /** Basename of what was written. Null when cancelled. */
+  fileName: string | null;
+  byteSize: number | null;
+  losses: string[];
+}
+
+export interface TrackWithTrip extends Track {
+  tripName: string;
 }
 
 /** Cross-trip listings carry the owning trip's name for the library views. */

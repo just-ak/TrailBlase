@@ -62,31 +62,30 @@ the approved set in `package.json`; never disable the gate wholesale.
 Resolved and dry-run installed together on Node 26.13.0 / npm 11.20.0 with no
 peer conflicts. Treat this as the baseline; re-verify before changing any line.
 
-| Role             | Package                         | Version               |
-| ---------------- | ------------------------------- | --------------------- |
-| Runtime          | node                            | 26.13.0 (LTS Lithium) |
-| Desktop shell    | electron                        | 45.2.3                |
-| Electron build   | electron-vite                   | 6.0.0                 |
-| Packaging        | electron-builder                | 26.18.0               |
-| Native rebuild   | @electron/rebuild               | 4.2.1                 |
-| Bundler          | vite                            | 8.3.6                 |
-| React plugin     | @vitejs/plugin-react            | 6.2.1                 |
-| UI               | react / react-dom               | 19.3.1                |
-| Language         | typescript                      | 7.0.2                 |
-| Styling          | tailwindcss + @tailwindcss/vite | 4.3.4                 |
-| Mapping          | leaflet                         | 1.9.4                 |
-| XML parsing (P3) | fast-xml-parser                 | 5.12.0                |
-| KML (P3)         | @tmcw/togeojson                 | 7.1.3                 |
-| KMZ (P3)         | jszip                           | 3.10.2                |
-| FIT (P3)         | fit-file-parser                 | 6.2.7                 |
-| Database driver  | better-sqlite3                  | 13.0.3                |
-| ORM              | drizzle-orm                     | 0.45.4                |
-| Migrations       | drizzle-kit                     | 0.31.11               |
-| State            | zustand                         | 5.0.16                |
-| Validation       | zod                             | 4.6.7                 |
-| Unit tests       | vitest + @vitest/coverage-v8    | 5.1.0                 |
-| E2E tests        | playwright                      | 1.65.0                |
-| Lint             | oxlint                          | 1.91.0                |
+| Role            | Package                         | Version               |
+| --------------- | ------------------------------- | --------------------- |
+| Runtime         | node                            | 26.13.0 (LTS Lithium) |
+| Desktop shell   | electron                        | 45.2.3                |
+| Electron build  | electron-vite                   | 6.0.0                 |
+| Packaging       | electron-builder                | 26.18.0               |
+| Native rebuild  | @electron/rebuild               | 4.2.1                 |
+| Bundler         | vite                            | 8.3.6                 |
+| React plugin    | @vitejs/plugin-react            | 6.2.1                 |
+| UI              | react / react-dom               | 19.3.1                |
+| Language        | typescript                      | 7.0.2                 |
+| Styling         | tailwindcss + @tailwindcss/vite | 4.3.4                 |
+| Mapping         | leaflet                         | 1.9.4                 |
+| XML parsing     | fast-xml-parser                 | 5.12.0                |
+| KMZ (zip)       | jszip                           | 3.10.2                |
+| FIT             | fit-file-parser                 | 6.2.7                 |
+| Database driver | better-sqlite3                  | 13.0.3                |
+| ORM             | drizzle-orm                     | 0.45.4                |
+| Migrations      | drizzle-kit                     | 0.31.11               |
+| State           | zustand                         | 5.0.16                |
+| Validation      | zod                             | 4.6.7                 |
+| Unit tests      | vitest + @vitest/coverage-v8    | 5.1.0                 |
+| E2E tests       | playwright                      | 1.65.0                |
+| Lint            | oxlint                          | 1.91.0                |
 
 ### Linting: oxlint, not typescript-eslint
 
@@ -111,6 +110,15 @@ licence check first. See ADR 0008.
 
 Tailwind 4 is configured through the `@tailwindcss/vite` plugin and CSS-first
 `@theme` directives. There is no `tailwind.config.js` and no PostCSS pipeline.
+
+### No GeoJSON intermediate for KML
+
+`@tmcw/togeojson` was considered for KML and rejected. It converts to GeoJSON,
+which flattens names, descriptions and `ExtendedData` that the import-fidelity
+rule requires us to preserve or report. GPX, KML and TCX are all parsed directly
+with `fast-xml-parser`, which keeps one parsing approach and full control over
+what survives. It also avoids pulling in an XML DOM implementation, since
+togeojson needs one under Node.
 
 ### SQLite driver
 

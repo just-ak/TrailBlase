@@ -9,7 +9,7 @@ import type { ObjectRef, TreeNode, TripSortKey } from "@shared/domain/types";
 import { ContextMenu, type MenuItem } from "../../components/ContextMenu";
 import * as actions from "../../lib/actions";
 import { api, call, describeError } from "../../lib/client";
-import { useLibraryStore } from "../../stores/libraryStore";
+import { useLibraryStore, type ObjectSortKey } from "../../stores/libraryStore";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useUiStore } from "../../stores/uiStore";
 import { TreeRow } from "./TreeRow";
@@ -77,6 +77,8 @@ export function LibraryPanel(): ReactNode {
     sortKey,
     sortDirection,
     setSort,
+    objectSortKey,
+    setObjectSort,
     showArchived,
     setShowArchived,
     search,
@@ -525,8 +527,6 @@ export function LibraryPanel(): ReactNode {
             <option value="name">Name</option>
             <option value="updatedAt">Modified</option>
             <option value="createdAt">Created</option>
-            {/* Sorting by distance needs tracks as well as routes, so it
-                arrives in Phase 3 rather than being half-right now. */}
           </select>
           <button
             type="button"
@@ -546,6 +546,60 @@ export function LibraryPanel(): ReactNode {
             />
             Archived
           </label>
+        </div>
+
+        <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
+          {/*
+            Objects are sorted separately from trips: distance is meaningless
+            for a trip, and a trip's modified date is not a route's. One
+            control for both would be wrong for half the tree.
+          */}
+          <label htmlFor="objectSortKey" className="sr-only">
+            Sort routes and tracks by
+          </label>
+          <select
+            id="objectSortKey"
+            value={objectSortKey}
+            onChange={(event) =>
+              setObjectSort(event.target.value as ObjectSortKey)
+            }
+            className="rounded border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-1 py-0.5"
+          >
+            <option value="name">Objects: name</option>
+            {/* Offered now that tracks and routes both have a distance. */}
+            <option value="distance">Objects: distance</option>
+          </select>
+
+          {/*
+            Import is reachable without a selection, because the first thing a
+            new user does is bring in their existing files and there is nothing
+            selected yet.
+          */}
+          <button
+            type="button"
+            // A distinct name from the trip panel's "Import…", so assistive
+            // technology and tests can tell the two apart.
+            aria-label="Import files"
+            onClick={() => void actions.chooseFilesToImport()}
+            className="ml-auto rounded border border-[var(--color-border-subtle)] px-1.5 py-0.5 hover:bg-[var(--color-surface-sunken)]"
+          >
+            Import…
+          </button>
+          <button
+            type="button"
+            aria-label="Export selection"
+            onClick={() => {
+              const scope = actions.currentExportScope();
+              if (scope === null) {
+                showToast("Select a trip or object to export.", "error");
+                return;
+              }
+              actions.openExportDialog(scope);
+            }}
+            className="rounded border border-[var(--color-border-subtle)] px-1.5 py-0.5 hover:bg-[var(--color-surface-sunken)]"
+          >
+            Export…
+          </button>
         </div>
       </div>
 

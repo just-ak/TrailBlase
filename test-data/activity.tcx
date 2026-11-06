@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TCX activity. Heart rate and cadence have no columns in our schema, so they
+  must be retained as unmapped metadata rather than discarded.
+-->
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+  <Activities>
+    <Activity Sport="Hiking">
+      <Id>2026-07-14T06:30:00Z</Id>
+      <Lap StartTime="2026-07-14T06:30:00Z">
+        <TotalTimeSeconds>2400</TotalTimeSeconds>
+        <DistanceMeters>4200</DistanceMeters>
+        <Track>
+          <Trackpoint>
+            <Time>2026-07-14T06:30:00Z</Time>
+            <Position>
+              <LatitudeDegrees>46.5197</LatitudeDegrees>
+              <LongitudeDegrees>8.0120</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>1850.5</AltitudeMeters>
+            <HeartRateBpm><Value>118</Value></HeartRateBpm>
+            <Cadence>62</Cadence>
+          </Trackpoint>
+          <Trackpoint>
+            <Time>2026-07-14T06:45:00Z</Time>
+            <Position>
+              <LatitudeDegrees>46.5231</LatitudeDegrees>
+              <LongitudeDegrees>8.0168</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>1902.25</AltitudeMeters>
+            <HeartRateBpm><Value>131</Value></HeartRateBpm>
+            <Cadence>64</Cadence>
+          </Trackpoint>
+          <Trackpoint>
+            <Time>2026-07-14T07:00:00Z</Time>
+            <Position>
+              <LatitudeDegrees>46.5310</LatitudeDegrees>
+              <LongitudeDegrees>8.0255</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>2010</AltitudeMeters>
+          </Trackpoint>
+        </Track>
+      </Lap>
+    </Activity>
+  </Activities>
+</TrainingCenterDatabase>

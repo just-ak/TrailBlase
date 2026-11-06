@@ -19,3 +19,6 @@ blob-report/
 .env.local
 *.p12
 *.mobileprovision
+
+# Generated test fixtures (binary / bulk) — run `npm run fixtures`
+test-data/generated/

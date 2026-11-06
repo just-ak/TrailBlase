@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Google's gx:Track extension pairs <when> timestamps with <gx:coord> values,
+  as parallel sequences rather than nested elements.
+-->
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>Timed Track</name>
+    <Placemark>
+      <name>Recorded Walk</name>
+      <gx:Track>
+        <when>2026-07-14T06:30:00Z</when>
+        <when>2026-07-14T06:45:00Z</when>
+        <when>2026-07-14T07:00:00Z</when>
+        <gx:coord>8.0120 46.5197 1850.5</gx:coord>
+        <gx:coord>8.0168 46.5231 1902.25</gx:coord>
+        <gx:coord>8.0255 46.5310 2010</gx:coord>
+      </gx:Track>
+    </Placemark>
+  </Document>
+</kml>

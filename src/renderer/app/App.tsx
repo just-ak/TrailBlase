@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Toast } from "../components/Toast";
 import { AboutDialog } from "../features/about/AboutDialog";
 import { RestoreDialog } from "../features/backup/RestoreDialog";
+import { ExportDialog } from "../features/export/ExportDialog";
+import { ImportDialog } from "../features/import/ImportDialog";
 import { ConfirmDeleteDialog } from "../features/library/ConfirmDeleteDialog";
 import { SettingsDialog } from "../features/settings/SettingsDialog";
 import * as actions from "../lib/actions";
@@ -87,6 +89,19 @@ export function App(): ReactNode {
         case "backup:restore":
           openDialog({ kind: "restore" });
           break;
+        case "import:open":
+          void actions.chooseFilesToImport();
+          break;
+        case "export:open":
+          void (() => {
+            const scope = actions.currentExportScope();
+            if (scope === null) {
+              showToast("Select a trip or an object to export.", "error");
+              return;
+            }
+            actions.openExportDialog(scope);
+          })();
+          break;
         case "edit:undo":
           void actions.undo();
           break;
@@ -152,6 +167,15 @@ export function App(): ReactNode {
       {dialog.kind === "confirmDelete" && (
         <ConfirmDeleteDialog target={dialog.target} counts={dialog.counts} />
       )}
+      {dialog.kind === "import" && (
+        // Keyed on the staged set so choosing a new batch while one is open
+        // remounts with fresh selection state rather than merging the two.
+        <ImportDialog
+          key={dialog.staged.map((file) => file.token).join(",")}
+          staged={dialog.staged}
+        />
+      )}
+      {dialog.kind === "export" && <ExportDialog scope={dialog.scope} />}
 
       <Toast />
     </>

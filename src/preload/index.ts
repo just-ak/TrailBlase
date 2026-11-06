@@ -1,7 +1,8 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { CHANNELS, EVENTS, type MenuAction } from '@shared/ipc/channels';
 import type { TrailRtApi } from '@shared/ipc/api';
 import type { UndoState } from '@shared/domain/types';
+import type { ImportProgress } from '@shared/io/types';
 
 /**
  * The context bridge surface.
@@ -94,6 +95,58 @@ const api: TrailRtApi = {
     groups: (req) => call(CHANNELS.waypoints.groups, req),
     createGroup: (req) => call(CHANNELS.waypoints.createGroup, req),
   },
+  tracks: {
+    listForTrip: (req) => call(CHANNELS.tracks.listForTrip, req),
+    listAll: () => call(CHANNELS.tracks.listAll),
+    get: (req) => call(CHANNELS.tracks.get, req),
+    geometry: (req) => call(CHANNELS.tracks.geometry, req),
+    update: (req) => call(CHANNELS.tracks.update, req),
+    move: (req) => call(CHANNELS.tracks.move, req),
+    reverse: (req) => call(CHANNELS.tracks.reverse, req),
+    previewSimplify: (req) => call(CHANNELS.tracks.previewSimplify, req),
+    simplify: (req) => call(CHANNELS.tracks.simplify, req),
+    split: (req) => call(CHANNELS.tracks.split, req),
+    join: (req) => call(CHANNELS.tracks.join, req),
+    deleteRange: (req) => call(CHANNELS.tracks.deleteRange, req),
+    delete: (req) => call(CHANNELS.tracks.delete, req),
+    hasOriginal: (req) => call(CHANNELS.tracks.hasOriginal, req),
+    restoreOriginal: (req) => call(CHANNELS.tracks.restoreOriginal, req),
+  },
+  importing: {
+    choose: () => call(CHANNELS.importing.choose),
+    /**
+     * Resolves dropped `File` objects to paths and stages them.
+     *
+     * `webUtils.getPathForFile` is the only way to do this under
+     * `sandbox: true` — `File.path` was removed in Electron 32. It lives here
+     * rather than in the renderer precisely so the renderer never holds the
+     * resulting string: the paths go straight to the main process and come
+     * back as opaque tokens.
+     */
+    addDroppedFiles: (files) => {
+      const paths = files
+        .map((file) => webUtils.getPathForFile(file))
+        .filter((path) => path.length > 0);
+      if (paths.length === 0) {
+        return Promise.resolve({
+          ok: false,
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Those items could not be read as files.',
+          },
+        });
+      }
+      return call(CHANNELS.importing.addPaths, { paths });
+    },
+    commit: (req) => call(CHANNELS.importing.commit, req),
+    discard: (req) => call(CHANNELS.importing.discard, req),
+    history: (req) => call(CHANNELS.importing.history, req),
+    clearHistory: () => call(CHANNELS.importing.clearHistory),
+  },
+  exporting: {
+    options: (req) => call(CHANNELS.exporting.options, req),
+    run: (req) => call(CHANNELS.exporting.run, req),
+  },
   geometry: {
     forTrip: (req) => call(CHANNELS.geometry.forTrip, req),
   },
@@ -117,6 +170,8 @@ const api: TrailRtApi = {
       subscribe<[]>(EVENTS.libraryChanged, listener),
     onUndoStateChanged: (listener) =>
       subscribe<[UndoState]>(EVENTS.undoStateChanged, listener),
+    onImportProgress: (listener) =>
+      subscribe<[ImportProgress]>(EVENTS.importProgress, listener),
   },
 };
 

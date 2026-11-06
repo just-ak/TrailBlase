@@ -7,6 +7,7 @@ import type {
 } from '@shared/domain/types';
 import type { WaypointWithTrip } from '@shared/ipc/api';
 import type { Db } from '../client';
+import { encodeMetadata } from '../metadata';
 import { trips, waypointGroups, waypoints } from '../schema';
 
 export function rowToWaypoint(row: typeof waypoints.$inferSelect): Waypoint {
@@ -80,6 +81,8 @@ export interface InsertWaypointValues {
   symbol: string | null;
   notes: string | null;
   source: GeometrySource;
+  /** Imported fields with no column of their own. See db/metadata.ts. */
+  metadata?: Record<string, unknown> | undefined;
   now: number;
 }
 
@@ -98,6 +101,7 @@ export function insertWaypoint(db: Db, values: InsertWaypointValues): Waypoint {
       symbol: values.symbol,
       notes: values.notes,
       source: values.source,
+      metadata: encodeMetadata(values.metadata),
       createdAt: values.now,
       updatedAt: values.now,
     })

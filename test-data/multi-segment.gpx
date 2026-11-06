@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One track, three segments. Segment boundaries must be preserved: joining them
+  into a single run would invent travel across the gaps.
+-->
+<gpx version="1.1" creator="TrailRT test fixture" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Three Segments</name>
+    <trkseg>
+      <trkpt lat="46.0" lon="8.0"><ele>500</ele></trkpt>
+      <trkpt lat="46.01" lon="8.01"><ele>520</ele></trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="46.10" lon="8.10"><ele>700</ele></trkpt>
+      <trkpt lat="46.11" lon="8.11"><ele>720</ele></trkpt>
+      <trkpt lat="46.12" lon="8.12"><ele>740</ele></trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="46.20" lon="8.20"><ele>900</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

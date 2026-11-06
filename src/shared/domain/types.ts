@@ -70,6 +70,7 @@ export type TreeNodeKind =
   | 'trip'
   | 'view'
   | 'route'
+  | 'track'
   | 'waypoint';
 
 export type ViewId =
@@ -226,10 +227,19 @@ export interface Bounds {
   maxLon: number;
 }
 
-/** Everything the map needs to render one trip. */
+/**
+ * Everything the map needs to render one trip.
+ *
+ * Routes carry their points; **tracks do not**. A recorded track can hold
+ * hundreds of thousands of points, so only its metadata travels here and the
+ * map fetches geometry per track at the zoom it is drawing — see
+ * `tracks:geometry` and ADR 0003.
+ */
 export interface TripGeometry {
   tripId: Id;
   routes: RouteWithPoints[];
+  /** Metadata only. Geometry is fetched separately, per zoom. */
+  tracks: Track[];
   waypoints: Waypoint[];
   bounds: Bounds | null;
 }
@@ -241,4 +251,58 @@ export interface UndoState {
   /** Describes the action, for the menu label. Null when unavailable. */
   undoLabel: string | null;
   redoLabel: string | null;
+}
+
+// ------------------------------------------------------- Phase 3: tracks
+
+export interface TrackPoint {
+  lat: number;
+  lon: number;
+  /** Metres, or null when the recording carried none. */
+  ele: number | null;
+  /** Epoch milliseconds, or null when untimed. */
+  time: number | null;
+}
+
+export interface TrackSegment {
+  points: TrackPoint[];
+}
+
+export interface TrackStats {
+  pointCount: number;
+  segmentCount: number;
+  distanceM: number | null;
+  elevGainM: number | null;
+  elevLossM: number | null;
+  elevMinM: number | null;
+  elevMaxM: number | null;
+  /** Null when the recording has no timestamps — not zero. */
+  startedAt: Timestamp | null;
+  endedAt: Timestamp | null;
+  durationS: number | null;
+}
+
+export interface Track extends TrackStats {
+  id: Id;
+  tripId: Id;
+  name: string;
+  colour: string | null;
+  width: number | null;
+  source: GeometrySource;
+  /** True when the original imported bytes are retained and recoverable. */
+  hasOriginal: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface TrackWithPoints extends Track {
+  segments: TrackSegment[];
+}
+
+/** What the map needs to draw a track: either the cache or real points. */
+export interface TrackGeometry {
+  trackId: Id;
+  /** True when these came from the simplified render cache. */
+  simplified: boolean;
+  segments: { points: { lat: number; lon: number }[] }[];
 }

@@ -3,6 +3,7 @@ import type {
   Folder,
   ObjectRef,
   RouteWithPoints,
+  TrackWithPoints,
   TripWithCounts,
   Waypoint,
 } from '@shared/domain/types';
@@ -26,6 +27,7 @@ interface SelectionState {
   trip: TripWithCounts | null;
   folder: Folder | null;
   route: RouteWithPoints | null;
+  track: TrackWithPoints | null;
   waypoint: Waypoint | null;
   loading: boolean;
 
@@ -38,6 +40,7 @@ const EMPTY = {
   trip: null,
   folder: null,
   route: null,
+  track: null,
   waypoint: null,
 } as const;
 
@@ -114,8 +117,23 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
         await ensureGeometry(waypoint?.tripId ?? null);
         return;
       }
+      case 'track': {
+        // `tracks.get` returns the points as well as the statistics. For a
+        // 200,000-point track that is a large payload, which is why the map
+        // does not use this path — it fetches drawing geometry by zoom. The
+        // properties panel needs real counts and timestamps, so it pays for it
+        // once per selection rather than per render.
+        const track = await callOr(api().tracks.get({ id: ref.id }), null);
+        set({
+          ...EMPTY,
+          track,
+          loading: false,
+          ...(track === null ? { selected: null } : {}),
+        });
+        await ensureGeometry(track?.tripId ?? null);
+        return;
+      }
       default: {
-        // Tracks arrive in Phase 3.
         set({ ...EMPTY, loading: false });
         return;
       }

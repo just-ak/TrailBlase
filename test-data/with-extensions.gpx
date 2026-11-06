@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Extension namespaces we have no columns for. They must be preserved in the
+  metadata JSON and listed in the import report as unmapped — never silently
+  discarded, and never pretended to be understood.
+-->
+<gpx version="1.1" creator="TrailRT test fixture"
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3"
+     xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+  <wpt lat="46.0207" lon="7.7491">
+    <ele>3000</ele>
+    <name>Extended Waypoint</name>
+    <sym>Summit</sym>
+    <extensions>
+      <gpxx:WaypointExtension>
+        <gpxx:DisplayMode>SymbolAndName</gpxx:DisplayMode>
+        <gpxx:Categories>
+          <gpxx:Category>Peaks</gpxx:Category>
+        </gpxx:Categories>
+      </gpxx:WaypointExtension>
+    </extensions>
+  </wpt>
+  <trk>
+    <name>Extended Track</name>
+    <extensions>
+      <gpxx:TrackExtension>
+        <gpxx:DisplayColor>Red</gpxx:DisplayColor>
+      </gpxx:TrackExtension>
+    </extensions>
+    <trkseg>
+      <trkpt lat="46.0207" lon="7.7491">
+        <ele>3000</ele>
+        <time>2026-09-02T07:00:00Z</time>
+        <extensions>
+          <gpxtpx:TrackPointExtension>
+            <gpxtpx:hr>142</gpxtpx:hr>
+            <gpxtpx:cad>78</gpxtpx:cad>
+          </gpxtpx:TrackPointExtension>
+        </extensions>
+      </trkpt>
+      <trkpt lat="46.0250" lon="7.7520">
+        <ele>3055</ele>
+        <time>2026-09-02T07:15:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

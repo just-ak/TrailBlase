@@ -25,7 +25,16 @@ export const emptySchema = z.object({}).strict();
 // ---------------------------------------------------------------- library
 
 export const libraryTreeRequest = z
-  .object({ includeArchived: z.boolean().default(false) })
+  .object({
+    includeArchived: z.boolean().default(false),
+    /**
+     * Ordering within the cross-trip views.
+     *
+     * Distance became meaningful in Phase 3, when tracks joined routes as
+     * objects that have one.
+     */
+    sortKey: z.enum(['name', 'distance', 'updatedAt']).default('name'),
+  })
   .strict();
 
 // ------------------------------------------------------------------ trips
@@ -353,3 +362,169 @@ export type RouteCreateRequest = z.infer<typeof routeCreateRequest>;
 export type RouteSetGeometryRequest = z.infer<typeof routeSetGeometryRequest>;
 export type WaypointCreateRequest = z.infer<typeof waypointCreateRequest>;
 export type WaypointUpdateRequest = z.infer<typeof waypointUpdateRequest>;
+
+// --------------------------------------------------------------- tracks
+
+/** A colour is a 6-digit hex string, or null for the default. */
+export const trackColourSchema = z
+  .string()
+  .regex(/^#[0-9a-f]{6}$/i)
+  .nullable();
+
+/** Line width in CSS pixels. Bounded so a stray value cannot blank the map. */
+export const trackWidthSchema = z.number().int().min(1).max(12).nullable();
+
+export const trackListForTripRequest = z.object({ tripId: idSchema }).strict();
+export const trackGetRequest = z.object({ id: idSchema }).strict();
+
+/**
+ * Geometry for the map.
+ *
+ * The zoom decides whether the simplified render cache or the real points are
+ * returned, so the renderer asks for what it is drawing rather than being told
+ * which representation to use.
+ */
+export const trackGeometryRequest = z
+  .object({ id: idSchema, zoom: z.number().int().min(0).max(24) })
+  .strict();
+
+export const trackUpdateRequest = z
+  .object({
+    id: idSchema,
+    name: nameSchema.optional(),
+    colour: trackColourSchema.optional(),
+    width: trackWidthSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.name !== undefined || v.colour !== undefined || v.width !== undefined,
+    { message: 'At least one field must be provided' },
+  );
+
+export const trackMoveRequest = z
+  .object({ id: idSchema, tripId: idSchema })
+  .strict();
+
+export const trackReverseRequest = z.object({ id: idSchema }).strict();
+export const trackDeleteRequest = z.object({ id: idSchema }).strict();
+export const trackHasOriginalRequest = z.object({ id: idSchema }).strict();
+export const trackRestoreOriginalRequest = z.object({ id: idSchema }).strict();
+
+/**
+ * Simplification tolerance in metres.
+ *
+ * Positive and bounded: zero would be a no-op dressed as an edit, and an
+ * unbounded value would reduce a track to its endpoints without warning.
+ */
+export const trackSimplifyRequest = z
+  .object({ id: idSchema, toleranceM: z.number().finite().min(0.1).max(10_000) })
+  .strict();
+
+export const trackPreviewSimplifyRequest = trackSimplifyRequest;
+
+export const trackSplitRequest = z
+  .object({ id: idSchema, pointIndex: z.number().int().min(0) })
+  .strict();
+
+export const trackJoinRequest = z
+  .object({
+    firstId: idSchema,
+    secondId: idSchema,
+    name: nameSchema.optional(),
+  })
+  .strict();
+
+export const trackDeleteRangeRequest = z
+  .object({
+    id: idSchema,
+    from: z.number().int().min(0),
+    to: z.number().int().min(0),
+  })
+  .strict();
+
+// -------------------------------------------------------- import / export
+
+export const importFormatSchema = z.enum([
+  'gpx',
+  'kml',
+  'kmz',
+  'tcx',
+  'fit',
+  'csv',
+  'json',
+]);
+
+export const exportFormatSchema = z.enum(['gpx', 'kml', 'kmz', 'csv', 'json']);
+
+/**
+ * A staged-file token.
+ *
+ * Opaque to the renderer by design: it identifies a parsed file held in the
+ * main process, which is what lets the renderer confirm an import without ever
+ * holding a path.
+ */
+export const importTokenSchema = z.string().min(1).max(200);
+
+/** Selection within one staged file. Omitting an index list means "all". */
+export const importFileSelectionSchema = z
+  .object({
+    token: importTokenSchema,
+    destinationTripId: idSchema.nullable().default(null),
+    routeIndices: z.array(z.number().int().min(0)).max(100_000).optional(),
+    trackIndices: z.array(z.number().int().min(0)).max(100_000).optional(),
+    waypointIndices: z.array(z.number().int().min(0)).max(1_000_000).optional(),
+    retainOriginal: z.boolean().default(true),
+  })
+  .strict();
+
+export const importCommitRequest = z
+  .object({
+    files: z.array(importFileSelectionSchema).min(1).max(200),
+  })
+  .strict();
+
+export const importDiscardRequest = z
+  .object({ tokens: z.array(importTokenSchema).max(200).default([]) })
+  .strict();
+
+export const importHistoryRequest = z
+  .object({ limit: z.number().int().min(1).max(1000).default(100) })
+  .strict();
+
+/**
+ * Paths from a drag-and-drop.
+ *
+ * The renderer cannot produce these itself: the preload bridge resolves them
+ * from the dropped `File` objects with `webUtils.getPathForFile` and passes
+ * them straight through, so a path originates from a real user gesture rather
+ * than from renderer-side string construction.
+ */
+export const importAddPathsRequest = z
+  .object({ paths: z.array(z.string().min(1).max(4096)).min(1).max(200) })
+  .strict();
+
+export const exportScopeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('route'), id: idSchema }).strict(),
+  z.object({ kind: z.literal('track'), id: idSchema }).strict(),
+  z.object({ kind: z.literal('waypoint'), id: idSchema }).strict(),
+  z
+    .object({
+      kind: z.literal('trips'),
+      tripIds: z.array(idSchema).min(1).max(10_000),
+    })
+    .strict(),
+  z.object({ kind: z.literal('everything') }).strict(),
+]);
+
+export const exportOptionsRequest = z
+  .object({ scope: exportScopeSchema })
+  .strict();
+
+export const exportRunRequest = z
+  .object({ scope: exportScopeSchema, format: exportFormatSchema })
+  .strict();
+
+export type TrackUpdateRequest = z.infer<typeof trackUpdateRequest>;
+export type ImportFileSelection = z.infer<typeof importFileSelectionSchema>;
+export type ExportScopeRequest = z.infer<typeof exportScopeSchema>;

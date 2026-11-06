@@ -1,0 +1,6 @@
+name,latitude,longitude,elevation,description,symbol
+Grimsel Hut,46.5197,8.0120,1850.5,Overnight stop,lodging
+"Spring, upper",46.5602,8.0431,2431,"Reliable, even in August",water
+Unknown Height,45.9763,7.6586,,No elevation recorded,pin
+"Multi
+line note",46.0207,7.7491,3000,"Has an embedded newline",summit

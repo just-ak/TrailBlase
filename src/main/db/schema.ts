@@ -83,6 +83,12 @@ export const routes = sqliteTable(
     distanceM: real('distance_m'), // cache
     elevGainM: real('elev_gain_m'), // cache; null when no elevation data
     elevLossM: real('elev_loss_m'), // cache
+    /**
+     * JSON for fields an imported format carried that have no column of their
+     * own — GPX extensions, <url>, KML ExtendedData. Preserved so Phase 5 can
+     * round-trip them, and reported to the user on import.
+     */
+    metadata: text('metadata'),
     createdAt: integer('created_at').notNull().default(now),
     updatedAt: integer('updated_at').notNull().default(now),
   },
@@ -136,6 +142,8 @@ export const tracks = sqliteTable(
      */
     renderGeometry: blob('render_geometry', { mode: 'buffer' }),
     renderToleranceM: real('render_tolerance_m'),
+    /** As routes: imported fields with no column, preserved verbatim. */
+    metadata: text('metadata'),
     createdAt: integer('created_at').notNull().default(now),
     updatedAt: integer('updated_at').notNull().default(now),
   },
@@ -206,6 +214,8 @@ export const waypoints = sqliteTable(
     symbol: text('symbol'),
     notes: text('notes'),
     source: text('source').notNull().default('user'),
+    /** As routes: imported fields with no column, preserved verbatim. */
+    metadata: text('metadata'),
     createdAt: integer('created_at').notNull().default(now),
     updatedAt: integer('updated_at').notNull().default(now),
   },

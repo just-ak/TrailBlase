@@ -7,7 +7,13 @@ import {
 } from "react";
 import L from "leaflet";
 import { MAP_PROVIDERS } from "@shared/map/MapProvider";
-import type { Bounds, MapPosition } from "@shared/domain/types";
+import type {
+  Bounds,
+  MapPosition,
+  RouteWithPoints,
+  Track,
+  Waypoint,
+} from "@shared/domain/types";
 import { formatDistance } from "@shared/geo/units";
 import { pathDistance } from "@shared/geo/distance";
 import { ContextMenu, type MenuItem } from "../../components/ContextMenu";
@@ -22,6 +28,7 @@ import { getMapInstance, useMapInstance } from "./mapInstance";
 import { useDrawMode } from "./useDrawMode";
 import { useLeafletMap } from "./useLeafletMap";
 import { useRouteLayers } from "./useRouteLayers";
+import { useTrackLayers } from "./useTrackLayers";
 import { useWaypointLayers } from "./useWaypointLayers";
 
 /**
@@ -30,6 +37,17 @@ import { useWaypointLayers } from "./useWaypointLayers";
  * Layer rendering is delegated to hooks that attach to the single Leaflet
  * instance. This component wires them to the stores and owns the overlay UI.
  */
+
+/**
+ * Stable empty collections.
+ *
+ * Passing `?? []` inline gives a hook a new array identity on every render,
+ * which turns any effect that depends on it into a render loop. Shared frozen
+ * constants cost nothing and remove the hazard.
+ */
+const NO_ROUTES: readonly RouteWithPoints[] = [];
+const NO_TRACKS: readonly Track[] = [];
+const NO_WAYPOINTS: readonly Waypoint[] = [];
 
 function fitTo(bounds: Bounds | null): boolean {
   const map = getMapInstance();
@@ -60,6 +78,9 @@ export function MapView(): ReactNode {
   const pending = useEditorStore((s) => s.pending);
 
   const [layerMenuOpen, setLayerMenuOpen] = useState(false);
+  /** Per-point dots on the selected track. Off by default: see useTrackLayers. */
+  const [showPoints, setShowPoints] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [menu, setMenu] = useState<{
     x: number;
     y: number;
@@ -99,7 +120,7 @@ export function MapView(): ReactNode {
   // --- object layers
   useRouteLayers(
     map,
-    geometry?.routes ?? [],
+    geometry?.routes ?? NO_ROUTES,
     selected?.kind === "route" ? selected.id : null,
     {
       onSelect: (id) => void select({ kind: "route", id }),
@@ -139,9 +160,46 @@ export function MapView(): ReactNode {
     mode === "idle",
   );
 
+  useTrackLayers(
+    map,
+    geometry?.tracks ?? NO_TRACKS,
+    selected?.kind === "track" ? selected.id : null,
+    {
+      onSelect: (id) => void select({ kind: "track", id }),
+      onContextMenu: (id, x, y) => {
+        void select({ kind: "track", id });
+        setMenu({
+          x,
+          y,
+          items: [
+            { label: "Fit Track to Screen", onSelect: () => void fitTrack(id) },
+            {
+              label: "Reverse Track",
+              separatorBefore: true,
+              onSelect: () => void actions.reverseTrack(id),
+            },
+            {
+              label: "Export Track\u2026",
+              onSelect: () => actions.openExportDialog({ kind: "track", id }),
+            },
+            {
+              // No "undo with \u2318Z" promise here: a track deletion is not
+              // reversible from the stack, and the properties panel says so.
+              label: "Delete Track",
+              danger: true,
+              separatorBefore: true,
+              onSelect: () => void actions.deleteTrack(id),
+            },
+          ],
+        });
+      },
+    },
+    { showPoints },
+  );
+
   useWaypointLayers(
     map,
-    geometry?.waypoints ?? [],
+    geometry?.waypoints ?? NO_WAYPOINTS,
     selected?.kind === "waypoint" ? selected.id : null,
     {
       onSelect: (id) => void select({ kind: "waypoint", id }),
@@ -258,6 +316,42 @@ export function MapView(): ReactNode {
     [showToast],
   );
 
+  /**
+   * Fits a track.
+   *
+   * Asks the main process for the box rather than reading points in the
+   * renderer: the trip geometry deliberately carries no track points, and
+   * fetching 200,000 of them to find four numbers would be absurd. The main
+   * process computes it with a SQL aggregate.
+   */
+  const fitTrack = useCallback(
+    async (trackId: string) => {
+      const geom = await callOr(
+        api().tracks.geometry({ id: trackId, zoom: 0 }),
+        null,
+      );
+      const points = geom?.segments.flatMap((segment) => segment.points) ?? [];
+      if (points.length === 0) {
+        showToast("That track has no points to fit.", "error");
+        return;
+      }
+      let minLat = points[0]?.lat ?? 0;
+      let maxLat = minLat;
+      let minLon = points[0]?.lon ?? 0;
+      let maxLon = minLon;
+      // Folded rather than spread into Math.min: a simplified track is still
+      // thousands of points, and `Math.min(...xs)` has an argument limit.
+      for (const point of points) {
+        if (point.lat < minLat) minLat = point.lat;
+        if (point.lat > maxLat) maxLat = point.lat;
+        if (point.lon < minLon) minLon = point.lon;
+        if (point.lon > maxLon) maxLon = point.lon;
+      }
+      fitTo({ minLat, maxLat, minLon, maxLon });
+    },
+    [showToast],
+  );
+
   // --- menu actions
   useEffect(() => {
     return api().events.onMenuAction((action) => {
@@ -283,12 +377,14 @@ export function MapView(): ReactNode {
         case "map:fitRoute": {
           const ref = useSelectionStore.getState().selected;
           if (ref?.kind === "route") fitRoute(ref.id);
-          else showToast("Select a route first.");
+          else if (ref?.kind === "track") void fitTrack(ref.id);
+          else showToast("Select a route or track first.");
           break;
         }
         case "map:returnToSelection": {
           const state = useSelectionStore.getState();
           if (state.route !== null) fitRoute(state.route.id);
+          else if (state.track !== null) void fitTrack(state.track.id);
           else if (state.waypoint !== null) {
             getMapInstance()?.panTo([state.waypoint.lat, state.waypoint.lon]);
           } else {
@@ -307,7 +403,7 @@ export function MapView(): ReactNode {
           break;
       }
     });
-  }, [handle, fitRoute, showToast]);
+  }, [handle, fitRoute, fitTrack, showToast]);
 
   const setProvider = async (id: string): Promise<void> => {
     await useSettingsStore.getState().set({ key: "mapProviderId", value: id });
@@ -327,9 +423,45 @@ export function MapView(): ReactNode {
   const pendingDistance = pending.length < 2 ? null : pathDistance(pending);
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div
+      className="relative flex-1 overflow-hidden"
+      /*
+       * Drag-and-drop import.
+       *
+       * `dragover` must be prevented for a drop to fire at all, which is the
+       * usual cause of "my drop handler never runs". The dropped `File` objects
+       * go straight to the preload bridge, which resolves them with
+       * `webUtils.getPathForFile` — the renderer never sees a path.
+       */
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDragOver(true);
+      }}
+      onDragLeave={(event) => {
+        // Fires for children too, so only a leave of the container counts.
+        if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+        setDragOver(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragOver(false);
+        const files = [...event.dataTransfer.files];
+        if (files.length === 0) return;
+        void actions.importDroppedFiles(files);
+      }}
+    >
       {/* oxlint-disable-next-line react/refs */}
       <div ref={handle.containerRef} className="absolute inset-0" />
+
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-4 z-[700] flex items-center justify-center rounded-xl border-2 border-dashed border-[var(--color-accent)] bg-[var(--color-surface)]/80">
+          <p className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+            Drop GPX, KML, KMZ, TCX, FIT or CSV files to import
+          </p>
+        </div>
+      )}
 
       {/* Mode hint bar. Also the place that states no road-snapping happens. */}
       {mode !== "idle" && (
@@ -361,6 +493,26 @@ export function MapView(): ReactNode {
       )}
 
       <div className="absolute top-3 right-3 z-[500] flex flex-col gap-1.5">
+        {/* Offered only with a track selected, and only above the simplification
+            threshold where the real samples are what is drawn. Showing it for a
+            whole trip is how a 200,000-point map stops responding. */}
+        {selected?.kind === "track" && (
+          <button
+            type="button"
+            aria-label="Show track points"
+            aria-pressed={showPoints}
+            onClick={() => setShowPoints((current) => !current)}
+            className={`rounded-md border px-2 py-1 text-[11px] shadow-md ${
+              showPoints
+                ? "border-[var(--color-accent)] bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                : "border-[var(--color-border-subtle)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
+            }`}
+            title="Show individual recorded points when zoomed in"
+          >
+            Points
+          </button>
+        )}
+
         <div className="flex flex-col overflow-hidden rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface)] shadow-md">
           <button
             type="button"

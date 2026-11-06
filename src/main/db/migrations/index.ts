@@ -1,4 +1,5 @@
 import initial from './0000_initial.sql?raw';
+import addObjectMetadata from './0001_add_object_metadata.sql?raw';
 
 export interface Migration {
   /** Monotonic. Recorded in `schema_migrations` once applied. */
@@ -16,6 +17,9 @@ export interface Migration {
  */
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: '0000_initial', sql: initial },
+  // Phase 3: routes, tracks and waypoints gain a metadata column so imported
+  // fields with no column of their own are preserved rather than dropped.
+  { version: 2, name: '0001_add_object_metadata', sql: addObjectMetadata },
 ];
 
 /** drizzle-kit's statement separator. */

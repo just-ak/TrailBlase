@@ -1,4 +1,5 @@
 import type { RoutePoint } from '@shared/domain/types';
+import type { ExportScopeRequest } from '@shared/ipc/schemas';
 import {
   deletePoint,
   insertPointAt,
@@ -283,6 +284,137 @@ export function currentTripId(): string | null {
   const selection = useSelectionStore.getState();
   if (selection.trip !== null) return selection.trip.id;
   if (selection.route !== null) return selection.route.tripId;
+  if (selection.track !== null) return selection.track.tripId;
   if (selection.waypoint !== null) return selection.waypoint.tripId;
   return useGeometryStore.getState().tripId;
+}
+
+// ------------------------------------------------------------------ tracks
+
+/**
+ * Track editing.
+ *
+ * Deliberately range-based rather than per-vertex. A recorded track has
+ * hundreds of thousands of samples, so "drag this point" is neither a gesture
+ * a user wants nor one the undo stack can afford — see ADR 0003. What a user
+ * actually does to a recording is trim it, split it, join it, or simplify it,
+ * and those are the operations here.
+ */
+
+export async function renameTrack(id: string, name: string): Promise<void> {
+  await run(() => call(api().tracks.update({ id, name })));
+}
+
+export async function setTrackColour(id: string, colour: string): Promise<void> {
+  await run(() => call(api().tracks.update({ id, colour })));
+}
+
+export async function setTrackWidth(id: string, width: number): Promise<void> {
+  await run(() => call(api().tracks.update({ id, width })));
+}
+
+export async function reverseTrack(id: string): Promise<void> {
+  await run(() => call(api().tracks.reverse({ id })));
+}
+
+/** The resulting point count, so the user agrees to a known cost. */
+export async function previewTrackSimplify(
+  id: string,
+  toleranceM: number,
+): Promise<{ before: number; after: number } | null> {
+  try {
+    return await call(api().tracks.previewSimplify({ id, toleranceM }));
+  } catch (cause) {
+    toast(describeError(cause), 'error');
+    return null;
+  }
+}
+
+export async function simplifyTrack(
+  id: string,
+  toleranceM: number,
+): Promise<void> {
+  const ok = await run(() => call(api().tracks.simplify({ id, toleranceM })));
+  if (ok) {
+    // Honest about the limit: the inverse of a 200,000-point edit is not on the
+    // undo stack, and the retained original is the way back.
+    toast('Track simplified. Restore the original from its properties if needed.');
+  }
+}
+
+export async function splitTrack(
+  id: string,
+  pointIndex: number,
+): Promise<void> {
+  await run(() => call(api().tracks.split({ id, pointIndex })));
+}
+
+export async function joinTracks(
+  firstId: string,
+  secondId: string,
+): Promise<void> {
+  await run(() => call(api().tracks.join({ firstId, secondId })));
+}
+
+export async function deleteTrackPointRange(
+  id: string,
+  from: number,
+  to: number,
+): Promise<void> {
+  await run(() => call(api().tracks.deleteRange({ id, from, to })));
+}
+
+export async function restoreTrackOriginal(id: string): Promise<void> {
+  const ok = await run(() => call(api().tracks.restoreOriginal({ id })));
+  if (ok) toast('Track geometry restored from the imported file.');
+}
+
+export async function deleteTrack(id: string): Promise<void> {
+  const ok = await run(() => call(api().tracks.delete({ id })));
+  if (ok) {
+    useSelectionStore.getState().clear();
+    // Stated plainly rather than implying an undo that does not exist.
+    toast('Track deleted. This one cannot be undone.');
+  }
+}
+
+// ------------------------------------------------------- import and export
+
+export async function chooseFilesToImport(): Promise<void> {
+  const ui = useUiStore.getState();
+  try {
+    const staged = await call(api().importing.choose());
+    if (staged.length === 0) return;
+    ui.openDialog({ kind: 'import', staged });
+  } catch (cause) {
+    toast(describeError(cause), 'error');
+  }
+}
+
+/** Drag-and-drop. The bridge resolves the paths; the renderer never sees them. */
+export async function importDroppedFiles(files: readonly File[]): Promise<void> {
+  const ui = useUiStore.getState();
+  try {
+    const staged = await call(api().importing.addDroppedFiles(files));
+    if (staged.length === 0) return;
+    ui.openDialog({ kind: 'import', staged });
+  } catch (cause) {
+    toast(describeError(cause), 'error');
+  }
+}
+
+export function openExportDialog(scope: ExportScopeRequest): void {
+  useUiStore.getState().openDialog({ kind: 'export', scope });
+}
+
+/** The export scope implied by the current selection. */
+export function currentExportScope(): ExportScopeRequest | null {
+  const selection = useSelectionStore.getState();
+  if (selection.route !== null) return { kind: 'route', id: selection.route.id };
+  if (selection.track !== null) return { kind: 'track', id: selection.track.id };
+  if (selection.waypoint !== null) {
+    return { kind: 'waypoint', id: selection.waypoint.id };
+  }
+  const tripId = currentTripId();
+  return tripId === null ? null : { kind: 'trips', tripIds: [tripId] };
 }

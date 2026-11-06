@@ -54,14 +54,39 @@ good set rather than an aspiration.
 2. **Routes and waypoints** — _complete._ Draw routes on the map, drag/insert/
    delete vertices, waypoints with a Garmin-aligned symbol set, derived
    statistics, and an undo history over every edit
-3. **Tracks and import/export** — GPX, KML/KMZ, TCX, FIT, CSV, JSON, with an
-   import report that never silently discards data
+3. **Tracks and import/export** — _complete._ Recorded tracks with a simplified
+   render cache for large files, import with a preview-then-commit pipeline, and
+   an import report that never silently discards data
 4. **Advanced mapping** — additional providers, routing abstraction, elevation
    profiles
 5. **Garmin compatibility** — GDB, IMG and device transfer investigations
 
 Phases are built in order. Later phases are specified at requirements level only
 until the phase before them is built and tested.
+
+## File formats
+
+Only formats with tests against real fixtures are listed. Nothing here is a
+claim of support that has not been exercised.
+
+| Format                    | Read | Write | Notes                                                                                                                          |
+| ------------------------- | ---- | ----- | ------------------------------------------------------------------------------------------------------------------------------ |
+| GPX 1.0 / 1.1             | ✓    | ✓     | Waypoints, routes and multi-segment tracks. Round-trips exactly, including absent values                                       |
+| KML                       | ✓    | ✓     | `Placemark` Point and LineString, `MultiGeometry`, `gx:Track` with timestamps, `ExtendedData`                                  |
+| KMZ                       | ✓    | ✓     | The KML document inside the archive. Other archive contents are reported, not silently ignored                                 |
+| TCX                       | ✓    | —     | Activity trackpoints become tracks; laps become segments. Heart rate and cadence are preserved as metadata                     |
+| FIT                       | ✓    | —     | Via the MIT-licensed parser, not Garmin's SDK (ADR 0006/0007). Coordinates are quantised by the format, and the import says so |
+| CSV                       | ✓    | ✓     | Waypoints, with header mapping and delimiter detection for spreadsheets from elsewhere                                         |
+| TrailRT collection (JSON) | ✓    | ✓     | Whole trips, folders and geometry, for moving between installs. Imports as a merge, never an overwrite                         |
+| Garmin GDB                | —    | —     | Recognised and explained rather than accepted and failed. Phase 5                                                              |
+| Garmin IMG                | —    | —     | Map products rather than trip data. Phase 5                                                                                    |
+
+**TCX and FIT are deliberately read-only.** Both describe a recording session —
+laps, device identity, sport — that TrailRT does not hold, so writing one would
+mean inventing that data. A file claiming to be a Garmin activity and not being
+one is worse than the absence of the option. Export as GPX instead.
+
+Nothing in TrailRT circumvents encryption, DRM or map licensing.
 
 ## Licence
 

@@ -396,14 +396,15 @@ describe('libraryService.tree', () => {
     const root = libraryService.tree(db, { includeArchived: false });
     const byId = new Map(root.children.map((c) => [c.viewId, c]));
 
-    // Implemented as of Phase 2.
+    // Implemented as of Phase 3.
     expect(byId.get('trips')?.available).toBe(true);
     expect(byId.get('routes')?.available).toBe(true);
     expect(byId.get('waypoints')?.available).toBe(true);
+    expect(byId.get('tracks')?.available).toBe(true);
+    expect(byId.get('imported')?.available).toBe(true);
 
-    // Still to come: tracks and imports are Phase 3.
-    expect(byId.get('tracks')?.available).toBe(false);
-    expect(byId.get('imported')?.available).toBe(false);
+    // Still to come. Marked unavailable so the UI says so rather than showing
+    // an empty branch that looks broken.
     expect(byId.get('recent')?.available).toBe(false);
   });
 

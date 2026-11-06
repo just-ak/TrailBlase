@@ -19,6 +19,9 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+/** Columns added by a later migration, asserted separately from table names. */
+const EXPECTED_METADATA_COLUMNS = ['routes', 'tracks', 'waypoints'];
+
 const EXPECTED_TABLES = [
   'attachments',
   'folders',
@@ -52,8 +55,10 @@ describe('migrations', () => {
     }
   });
 
-  it('records the applied version', () => {
-    expect(handle.migration.applied).toEqual([1]);
+  it('records every applied version', () => {
+    // Grows as migrations are added; compared against the build's own notion
+    // of current rather than a hardcoded list.
+    expect(handle.migration.applied).toEqual([1, 2]);
     expect(handle.migration.schemaVersion).toBe(expectedSchemaVersion());
   });
 
@@ -63,10 +68,21 @@ describe('migrations', () => {
     expect(second.alreadyCurrent).toBe(true);
   });
 
+  it('adds the metadata columns from migration 2', () => {
+    for (const table of EXPECTED_METADATA_COLUMNS) {
+      const columns = (
+        handle.sqlite.prepare(`PRAGMA table_info(${table})`).all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      expect(columns).toContain('metadata');
+    }
+  });
+
   it('applies nothing new when reopening an existing database', () => {
     const file = join(dir, 'reopen.db');
     const first = createDatabase({ file });
-    expect(first.migration.applied).toEqual([1]);
+    expect(first.migration.applied).toEqual([1, 2]);
     first.close();
 
     const second = createDatabase({ file });

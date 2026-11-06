@@ -8,6 +8,9 @@ import type {
   TripWithCounts,
 } from '@shared/domain/types';
 import type { WaypointWithTrip } from '@shared/ipc/api';
+
+/** Matches the main process `ObjectSortKey`. Distance arrived with tracks. */
+export type ObjectSortKey = 'name' | 'distance' | 'updatedAt';
 import { api, call, callOr } from '../lib/client';
 
 /**
@@ -28,6 +31,14 @@ interface LibraryState {
   sortKey: TripSortKey;
   sortDirection: SortDirection;
   showArchived: boolean;
+  /**
+   * Ordering inside the Routes / Tracks / Imported views.
+   *
+   * Separate from `sortKey`, which orders trips: distance is meaningless for a
+   * trip and a trip's `updatedAt` is not a route's. Conflating them would mean
+   * one control that is wrong for half the tree.
+   */
+  objectSortKey: ObjectSortKey;
 
   search: string;
   searchResults: TripWithCounts[] | null;
@@ -39,6 +50,7 @@ interface LibraryState {
   setExpanded(id: string, expanded: boolean): void;
   isExpanded(id: string): boolean;
   setSort(key: TripSortKey, direction: SortDirection): void;
+  setObjectSort(key: ObjectSortKey): void;
   setShowArchived(show: boolean): void;
   setSearch(query: string): Promise<void>;
 }
@@ -66,6 +78,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   sortKey: DEFAULT_SETTINGS.tripSortKey,
   sortDirection: DEFAULT_SETTINGS.tripSortDirection,
   showArchived: DEFAULT_SETTINGS.showArchivedTrips,
+  objectSortKey: 'name',
 
   search: '',
   searchResults: null,
@@ -84,7 +97,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const tree = await call(
-        api().library.tree({ includeArchived: get().showArchived }),
+        api().library.tree({
+          includeArchived: get().showArchived,
+          sortKey: get().objectSortKey,
+        }),
       );
       set({ tree, loading: false });
     } catch (cause) {
@@ -117,6 +133,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       api().settings.set({ key: 'tripSortDirection', value: sortDirection }),
       null,
     );
+  },
+
+  setObjectSort: (objectSortKey) => {
+    set({ objectSortKey });
+    void get().refresh();
   },
 
   setShowArchived: (showArchived) => {

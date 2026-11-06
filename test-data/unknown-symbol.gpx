@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Symbols outside our vocabulary. They must survive verbatim so export can
+  write them back unchanged, even though this build has no icon for them.
+-->
+<gpx version="1.1" creator="TrailRT test fixture" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="46.3" lon="8.3">
+    <name>Cache</name>
+    <sym>Geocache Found</sym>
+  </wpt>
+</gpx>

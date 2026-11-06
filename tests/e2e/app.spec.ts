@@ -78,15 +78,20 @@ test.describe('security posture', () => {
       hasInvoke: 'invoke' in window.trailrt,
       hasSend: 'send' in window.trailrt,
     }));
+    // An exact list, deliberately: a new namespace appearing here should be a
+    // decision someone made, not something that drifted in.
     expect(api.namespaces).toEqual([
       'app',
       'backup',
       'events',
+      'exporting',
       'folders',
       'geometry',
+      'importing',
       'library',
       'routes',
       'settings',
+      'tracks',
       'trips',
       'undo',
       'waypoints',
@@ -216,18 +221,19 @@ test.describe('library tree', () => {
   });
 
   test('marks later-phase branches rather than showing them as broken', async () => {
-    // Tracks and imports arrive in Phase 3, so those branches say so.
+    // Recently Used is still to come, so that branch says so.
     await expect(
-      harness.page.getByRole('treeitem', { name: 'Tracks', exact: true }),
-    ).toContainText('later phase');
-    await expect(
-      harness.page.getByRole('treeitem', { name: 'Imported Data', exact: true }),
+      harness.page.getByRole('treeitem', { name: 'Recently Used', exact: true }),
     ).toContainText('later phase');
 
-    // Routes and Waypoints are implemented as of Phase 2, so they must not.
-    await expect(
-      harness.page.getByRole('treeitem', { name: 'Routes', exact: true }),
-    ).not.toContainText('later phase');
+    // Everything else is implemented as of Phase 3 and must not claim
+    // otherwise. Tracks and Imported Data moved into this list with the
+    // import pipeline.
+    for (const branch of ['Routes', 'Tracks', 'Waypoints', 'Imported Data']) {
+      await expect(
+        harness.page.getByRole('treeitem', { name: branch, exact: true }),
+      ).not.toContainText('later phase');
+    }
   });
 });
 

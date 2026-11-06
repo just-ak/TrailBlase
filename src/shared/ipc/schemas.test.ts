@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  exportRunRequest,
   folderMoveRequest,
+  importAddPathsRequest,
+  importCommitRequest,
+  importHistoryRequest,
   openExternalRequest,
   settingsSetRequest,
+  trackGeometryRequest,
+  trackSimplifyRequest,
+  trackUpdateRequest,
   tripCreateRequest,
   tripSetStatusRequest,
   tripUpdateRequest,
@@ -326,6 +333,231 @@ describe('waypointMoveRequest', () => {
       waypointMoveRequest.safeParse({ id: VALID_ID, lat: 46.8, lon: 8.2 }).success,
     ).toBe(true);
     expect(waypointMoveRequest.safeParse({ id: VALID_ID, lat: 46.8 }).success).toBe(
+      false,
+    );
+  });
+});
+
+// -------------------------------------------------------- Phase 3 schemas
+
+describe('trackUpdateRequest', () => {
+  it('accepts a single field', () => {
+    expect(
+      trackUpdateRequest.parse({ id: VALID_ID, name: 'Walk' }),
+    ).toMatchObject({ name: 'Walk' });
+  });
+
+  it('rejects a payload with nothing to change', () => {
+    expect(trackUpdateRequest.safeParse({ id: VALID_ID }).success).toBe(false);
+  });
+
+  it('accepts null to clear the colour and width', () => {
+    const parsed = trackUpdateRequest.parse({
+      id: VALID_ID,
+      colour: null,
+      width: null,
+    });
+    expect(parsed.colour).toBeNull();
+    expect(parsed.width).toBeNull();
+  });
+
+  it('rejects a colour that is not a hex triplet', () => {
+    for (const colour of ['red', '#fff', '#1234567', 'rgb(1,2,3)']) {
+      expect(
+        trackUpdateRequest.safeParse({ id: VALID_ID, colour }).success,
+        colour,
+      ).toBe(false);
+    }
+  });
+
+  it('bounds the line width so a stray value cannot blank the map', () => {
+    expect(trackUpdateRequest.safeParse({ id: VALID_ID, width: 0 }).success).toBe(
+      false,
+    );
+    expect(
+      trackUpdateRequest.safeParse({ id: VALID_ID, width: 9999 }).success,
+    ).toBe(false);
+    expect(trackUpdateRequest.safeParse({ id: VALID_ID, width: 4 }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects an unknown field rather than ignoring it', () => {
+    expect(
+      trackUpdateRequest.safeParse({ id: VALID_ID, name: 'A', evil: 1 }).success,
+    ).toBe(false);
+  });
+});
+
+describe('trackGeometryRequest', () => {
+  it('bounds the zoom to a real map range', () => {
+    expect(trackGeometryRequest.safeParse({ id: VALID_ID, zoom: 12 }).success).toBe(
+      true,
+    );
+    expect(trackGeometryRequest.safeParse({ id: VALID_ID, zoom: -1 }).success).toBe(
+      false,
+    );
+    expect(trackGeometryRequest.safeParse({ id: VALID_ID, zoom: 99 }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('trackSimplifyRequest', () => {
+  // A zero tolerance would be a no-op presented as an edit; an unbounded one
+  // would reduce a track to its endpoints without warning.
+  it('requires a positive, bounded tolerance', () => {
+    expect(
+      trackSimplifyRequest.safeParse({ id: VALID_ID, toleranceM: 0 }).success,
+    ).toBe(false);
+    expect(
+      trackSimplifyRequest.safeParse({ id: VALID_ID, toleranceM: -5 }).success,
+    ).toBe(false);
+    expect(
+      trackSimplifyRequest.safeParse({ id: VALID_ID, toleranceM: 1e9 }).success,
+    ).toBe(false);
+    expect(
+      trackSimplifyRequest.safeParse({ id: VALID_ID, toleranceM: 10 }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a non-finite tolerance', () => {
+    expect(
+      trackSimplifyRequest.safeParse({
+        id: VALID_ID,
+        toleranceM: Number.POSITIVE_INFINITY,
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('importCommitRequest', () => {
+  it('accepts a single file with defaults applied', () => {
+    const parsed = importCommitRequest.parse({
+      files: [{ token: 'abc' }],
+    });
+    expect(parsed.files[0]).toMatchObject({
+      token: 'abc',
+      destinationTripId: null,
+      retainOriginal: true,
+    });
+  });
+
+  it('requires at least one file', () => {
+    expect(importCommitRequest.safeParse({ files: [] }).success).toBe(false);
+  });
+
+  it('rejects an empty token', () => {
+    expect(
+      importCommitRequest.safeParse({ files: [{ token: '' }] }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a negative selection index', () => {
+    expect(
+      importCommitRequest.safeParse({
+        files: [{ token: 'abc', routeIndices: [-1] }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an explicit destination trip', () => {
+    const parsed = importCommitRequest.parse({
+      files: [{ token: 'abc', destinationTripId: VALID_ID }],
+    });
+    expect(parsed.files[0]?.destinationTripId).toBe(VALID_ID);
+  });
+
+  it('rejects a destination that is not a uuid', () => {
+    expect(
+      importCommitRequest.safeParse({
+        files: [{ token: 'abc', destinationTripId: 'nope' }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('importAddPathsRequest', () => {
+  it('requires at least one path', () => {
+    expect(importAddPathsRequest.safeParse({ paths: [] }).success).toBe(false);
+  });
+
+  it('bounds the number of paths', () => {
+    expect(
+      importAddPathsRequest.safeParse({
+        paths: Array.from({ length: 201 }, () => '/tmp/a.gpx'),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a path that is not a string', () => {
+    expect(importAddPathsRequest.safeParse({ paths: [42] }).success).toBe(false);
+  });
+});
+
+describe('exportRunRequest', () => {
+  it('accepts each scope shape', () => {
+    for (const scope of [
+      { kind: 'route', id: VALID_ID },
+      { kind: 'track', id: VALID_ID },
+      { kind: 'waypoint', id: VALID_ID },
+      { kind: 'trips', tripIds: [VALID_ID] },
+      { kind: 'everything' },
+    ]) {
+      expect(
+        exportRunRequest.safeParse({ scope, format: 'gpx' }).success,
+        JSON.stringify(scope),
+      ).toBe(true);
+    }
+  });
+
+  // TCX and FIT are read-only by design, so they are rejected at the boundary
+  // rather than relying on the service to notice.
+  it('rejects a format TrailRT does not write', () => {
+    for (const format of ['tcx', 'fit', 'gdb', 'img']) {
+      expect(
+        exportRunRequest.safeParse({
+          scope: { kind: 'everything' },
+          format,
+        }).success,
+        format,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects an unknown scope kind', () => {
+    expect(
+      exportRunRequest.safeParse({
+        scope: { kind: 'database', id: VALID_ID },
+        format: 'gpx',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires at least one trip for a trips scope', () => {
+    expect(
+      exportRunRequest.safeParse({
+        scope: { kind: 'trips', tripIds: [] },
+        format: 'gpx',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an extra field smuggled into a scope', () => {
+    expect(
+      exportRunRequest.safeParse({
+        scope: { kind: 'everything', path: '/etc/passwd' },
+        format: 'gpx',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('importHistoryRequest', () => {
+  it('defaults and bounds the limit', () => {
+    expect(importHistoryRequest.parse({}).limit).toBe(100);
+    expect(importHistoryRequest.safeParse({ limit: 0 }).success).toBe(false);
+    expect(importHistoryRequest.safeParse({ limit: 100_000 }).success).toBe(
       false,
     );
   });

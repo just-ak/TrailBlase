@@ -86,9 +86,19 @@ export function buildApplicationMenu(undo: UndoState = NO_UNDO): Menu {
           click: dispatch('folder:new'),
         },
         { type: 'separator' },
-        later('Open…', 'Phase 3', 'Cmd+O'),
-        later('Import…', 'Phase 3', 'Shift+Cmd+I'),
-        later('Export…', 'Phase 3', 'Shift+Cmd+E'),
+        {
+          // "Open" and "Import" would be the same operation here: a file
+          // becomes objects in a trip, there is no document to open. One item,
+          // honestly named.
+          label: 'Import…',
+          accelerator: 'Shift+Cmd+I',
+          click: dispatch('import:open'),
+        },
+        {
+          label: 'Export…',
+          accelerator: 'Shift+Cmd+E',
+          click: dispatch('export:open'),
+        },
         { type: 'separator' },
         {
           // Not "Save": there is no unsaved state to flush. ADR 0001.

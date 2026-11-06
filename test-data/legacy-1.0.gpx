@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GPX 1.0: different namespace, and <url>/<urlname> instead of <link>. -->
+<gpx version="1.0" creator="TrailRT test fixture" xmlns="http://www.topografix.com/GPX/1/0">
+  <name>Legacy Sample</name>
+  <wpt lat="47.3769" lon="8.5417">
+    <ele>408</ele>
+    <time>2026-05-02T09:00:00Z</time>
+    <name>Old Format Point</name>
+    <desc>From a 2005-era device</desc>
+    <sym>Flag, Blue</sym>
+    <url>https://example.invalid/point</url>
+    <urlname>Reference</urlname>
+  </wpt>
+  <trk>
+    <name>Legacy Track</name>
+    <trkseg>
+      <trkpt lat="47.3769" lon="8.5417">
+        <ele>408</ele>
+        <time>2026-05-02T09:00:00Z</time>
+      </trkpt>
+      <trkpt lat="47.3800" lon="8.5450">
+        <ele>415</ele>
+        <time>2026-05-02T09:10:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

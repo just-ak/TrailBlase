@@ -61,6 +61,41 @@ export const CHANNELS = {
     groups: 'waypoints:groups',
     createGroup: 'waypoints:createGroup',
   },
+  tracks: {
+    listForTrip: 'tracks:listForTrip',
+    listAll: 'tracks:listAll',
+    get: 'tracks:get',
+    geometry: 'tracks:geometry',
+    update: 'tracks:update',
+    move: 'tracks:move',
+    reverse: 'tracks:reverse',
+    previewSimplify: 'tracks:previewSimplify',
+    simplify: 'tracks:simplify',
+    split: 'tracks:split',
+    join: 'tracks:join',
+    deleteRange: 'tracks:deleteRange',
+    delete: 'tracks:delete',
+    hasOriginal: 'tracks:hasOriginal',
+    restoreOriginal: 'tracks:restoreOriginal',
+  },
+  /**
+   * Import is a three-step conversation, not one call: the main process opens
+   * the dialog, parses, and hands back **opaque tokens** plus previews. The
+   * renderer confirms a selection against those tokens, so it never holds a
+   * filesystem path it could ask us to read.
+   */
+  importing: {
+    choose: 'import:choose',
+    addPaths: 'import:addPaths',
+    commit: 'import:commit',
+    discard: 'import:discard',
+    history: 'import:history',
+    clearHistory: 'import:clearHistory',
+  },
+  exporting: {
+    options: 'export:options',
+    run: 'export:run',
+  },
   geometry: {
     forTrip: 'geometry:forTrip',
   },
@@ -83,6 +118,8 @@ export const EVENTS = {
   themeChanged: 'event:themeChanged',
   libraryChanged: 'event:libraryChanged',
   undoStateChanged: 'event:undoStateChanged',
+  /** Coarse progress during a large import, pushed per file and per batch. */
+  importProgress: 'event:importProgress',
 } as const;
 
 /**
@@ -115,6 +152,8 @@ export const MENU_ACTIONS = [
   'backup:create',
   'backup:restore',
   'export:copy',
+  'import:open',
+  'export:open',
 ] as const;
 
 export type MenuAction = (typeof MENU_ACTIONS)[number];

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="TrailRT test fixture" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Alps Sample</name>
+    <desc>Synthetic fixture. Not real GPS data.</desc>
+  </metadata>
+
+  <wpt lat="46.5197" lon="8.0120">
+    <ele>1850.5</ele>
+    <time>2026-07-14T06:30:00Z</time>
+    <name>Grimsel Hut</name>
+    <desc>Overnight stop</desc>
+    <sym>Lodging</sym>
+    <cmt>Booked for two nights</cmt>
+  </wpt>
+  <wpt lat="46.5602" lon="8.0431">
+    <ele>2431</ele>
+    <name>Spring</name>
+    <sym>Drinking Water</sym>
+  </wpt>
+
+  <rte>
+    <name>Day 1 Planned</name>
+    <desc>Hut to pass</desc>
+    <rtept lat="46.5197" lon="8.0120">
+      <ele>1850.5</ele>
+      <name>Start</name>
+    </rtept>
+    <rtept lat="46.5310" lon="8.0255">
+      <ele>2010</ele>
+    </rtept>
+    <rtept lat="46.5602" lon="8.0431">
+      <ele>2431</ele>
+      <name>Pass</name>
+    </rtept>
+  </rte>
+
+  <trk>
+    <name>Day 1 Recorded</name>
+    <desc>What actually happened</desc>
+    <trkseg>
+      <trkpt lat="46.5197" lon="8.0120">
+        <ele>1850.5</ele>
+        <time>2026-07-14T06:30:00Z</time>
+      </trkpt>
+      <trkpt lat="46.5231" lon="8.0168">
+        <ele>1902.25</ele>
+        <time>2026-07-14T06:45:00Z</time>
+      </trkpt>
+      <trkpt lat="46.5310" lon="8.0255">
+        <ele>2010</ele>
+        <time>2026-07-14T07:20:00Z</time>
+      </trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="46.5402" lon="8.0310">
+        <ele>2180</ele>
+        <time>2026-07-14T08:05:00Z</time>
+      </trkpt>
+      <trkpt lat="46.5602" lon="8.0431">
+        <ele>2431</ele>
+        <time>2026-07-14T09:10:00Z</time>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>

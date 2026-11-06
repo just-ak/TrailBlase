@@ -8,6 +8,7 @@ import type {
 } from '@shared/domain/types';
 import type { Db } from '../db/client';
 import * as routeRepo from '../db/repositories/routes';
+import * as trackRepo from '../db/repositories/tracks';
 import * as waypointRepo from '../db/repositories/waypoints';
 import * as folderService from './folderService';
 import * as tripService from './tripService';
@@ -34,11 +35,31 @@ interface ViewSpec {
 const VIEWS: readonly ViewSpec[] = [
   { id: 'trips', name: 'Trips', available: true },
   { id: 'routes', name: 'Routes', available: true },
-  { id: 'tracks', name: 'Tracks', available: false }, // Phase 3
+  { id: 'tracks', name: 'Tracks', available: true },
   { id: 'waypoints', name: 'Waypoints', available: true },
-  { id: 'imported', name: 'Imported Data', available: false }, // Phase 3
+  { id: 'imported', name: 'Imported Data', available: true },
   { id: 'recent', name: 'Recently Used', available: false }, // later
 ];
+
+/**
+ * Sort key for the cross-trip views.
+ *
+ * Distance is only offered now that both routes and tracks have one. A null
+ * distance sorts last rather than as zero: an object whose length is unknown
+ * is not the shortest one.
+ */
+export type ObjectSortKey = 'name' | 'distance' | 'updatedAt';
+
+function byDistance(
+  a: number | null,
+  b: number | null,
+  direction: 1 | -1,
+): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return (a - b) * direction;
+}
 
 /** Metres rendered compactly for a tree row; full formatting is the UI's job. */
 function shortDistance(metres: number | null): string | undefined {
@@ -46,6 +67,29 @@ function shortDistance(metres: number | null): string | undefined {
   return metres < 1000
     ? `${Math.round(metres)} m`
     : `${(metres / 1000).toFixed(1)} km`;
+}
+
+/**
+ * A track row.
+ *
+ * Takes a structural subset rather than a full `Track`: the repository's
+ * cross-trip listing returns rows without the derived fields (`segmentCount`,
+ * `durationS`, elevation range), and a tree row needs none of them. Asking for
+ * only what is used avoids a cast that would claim otherwise.
+ */
+function trackNode(
+  track: { id: string; name: string; distanceM: number | null },
+  path: string,
+): TreeNode {
+  const detail = shortDistance(track.distanceM);
+  return {
+    id: `${path}/track:${track.id}`,
+    ref: { kind: 'track', id: track.id },
+    kind: 'track',
+    name: track.name,
+    ...(detail === undefined ? {} : { detail }),
+    children: [],
+  };
 }
 
 /** `path` makes the node id unique even when the object appears twice. */
@@ -74,6 +118,7 @@ function waypointNode(waypoint: Waypoint, path: string): TreeNode {
 function tripNode(
   trip: TripWithCounts,
   routes: readonly Route[],
+  tracks: readonly { id: string; name: string; distanceM: number | null }[],
   waypoints: readonly Waypoint[],
 ): TreeNode {
   const path = `trip:${trip.id}`;
@@ -85,12 +130,17 @@ function tripNode(
     status: trip.status,
     children: [
       ...routes.map((r) => routeNode(r, path)),
+      ...tracks.map((t) => trackNode(t, path)),
       ...waypoints.map((w) => waypointNode(w, path)),
     ],
   };
 }
 
-export function tree(db: Db, options: { includeArchived: boolean }): TreeNode {
+export function tree(
+  db: Db,
+  options: { includeArchived: boolean; sortKey?: ObjectSortKey },
+): TreeNode {
+  const sortKey = options.sortKey ?? 'name';
   const folders = folderService.list(db);
   const trips = tripService.list(db, {
     includeArchived: options.includeArchived,
@@ -102,6 +152,7 @@ export function tree(db: Db, options: { includeArchived: boolean }): TreeNode {
   // recursion — a collection with many trips would otherwise issue a query per
   // trip per render of the tree.
   const allRoutes = routeRepo.listAllRoutes(db);
+  const allTracks = trackRepo.listAllTracks(db);
   const allWaypoints = waypointRepo.listAllWaypoints(db);
 
   const routesByTrip = new Map<string, Route[]>();
@@ -109,6 +160,14 @@ export function tree(db: Db, options: { includeArchived: boolean }): TreeNode {
     const bucket = routesByTrip.get(route.tripId);
     if (bucket === undefined) routesByTrip.set(route.tripId, [route]);
     else bucket.push(route);
+  }
+
+  type TrackRow = (typeof allTracks)[number];
+  const tracksByTrip = new Map<string, TrackRow[]>();
+  for (const track of allTracks) {
+    const bucket = tracksByTrip.get(track.tripId);
+    if (bucket === undefined) tracksByTrip.set(track.tripId, [track]);
+    else bucket.push(track);
   }
 
   const waypointsByTrip = new Map<string, Waypoint[]>();
@@ -122,6 +181,7 @@ export function tree(db: Db, options: { includeArchived: boolean }): TreeNode {
     tripNode(
       trip,
       routesByTrip.get(trip.id) ?? [],
+      tracksByTrip.get(trip.id) ?? [],
       waypointsByTrip.get(trip.id) ?? [],
     );
 
@@ -171,9 +231,26 @@ export function tree(db: Db, options: { includeArchived: boolean }): TreeNode {
       // Cross-trip view: flat, annotated with the owning trip.
       node.children = allRoutes
         .filter((route) => visibleTripIds.has(route.tripId))
+        .toSorted((a, b) =>
+          sortKey === 'distance'
+            ? byDistance(a.distanceM, b.distanceM, 1)
+            : a.name.localeCompare(b.name),
+        )
         .map((route) => ({
           ...routeNode(route, 'view:routes'),
           detail: route.tripName,
+        }));
+    } else if (view.id === 'tracks') {
+      node.children = allTracks
+        .filter((track) => visibleTripIds.has(track.tripId))
+        .toSorted((a, b) =>
+          sortKey === 'distance'
+            ? byDistance(a.distanceM, b.distanceM, 1)
+            : a.name.localeCompare(b.name),
+        )
+        .map((track) => ({
+          ...trackNode(track, 'view:tracks'),
+          detail: track.tripName,
         }));
     } else if (view.id === 'waypoints') {
       node.children = allWaypoints
@@ -182,6 +259,40 @@ export function tree(db: Db, options: { includeArchived: boolean }): TreeNode {
           ...waypointNode(waypoint, 'view:waypoints'),
           detail: waypoint.tripName,
         }));
+    } else if (view.id === 'imported') {
+      // Everything whose geometry came from a file rather than being drawn
+      // here. A cross-trip view over `source`, which is exactly what the
+      // column is for.
+      node.children = [
+        ...allRoutes
+          .filter(
+            (route) =>
+              route.source === 'import' && visibleTripIds.has(route.tripId),
+          )
+          .map((route) => ({
+            ...routeNode(route, 'view:imported'),
+            detail: route.tripName,
+          })),
+        ...allTracks
+          .filter(
+            (track) =>
+              track.source === 'import' && visibleTripIds.has(track.tripId),
+          )
+          .map((track) => ({
+            ...trackNode(track, 'view:imported'),
+            detail: track.tripName,
+          })),
+        ...allWaypoints
+          .filter(
+            (waypoint) =>
+              waypoint.source === 'import' &&
+              visibleTripIds.has(waypoint.tripId),
+          )
+          .map((waypoint) => ({
+            ...waypointNode(waypoint, 'view:imported'),
+            detail: waypoint.tripName,
+          })),
+      ];
     }
 
     return node;

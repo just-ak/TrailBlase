@@ -9,6 +9,7 @@ import { useSelectionStore } from "../../stores/selectionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUiStore } from "../../stores/uiStore";
 import { RouteProperties } from "./RouteProperties";
+import { TrackProperties } from "./TrackProperties";
 import { WaypointProperties } from "./WaypointProperties";
 
 /**
@@ -156,13 +157,23 @@ function TripDetails({ trip }: { trip: TripWithCounts }): ReactNode {
           <li>{trip.waypointCount} waypoints</li>
         </ul>
         <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-          Tracks are imported from recorded GPS files, which arrives in a later
-          phase.
+          Tracks are recorded GPS files. Import GPX, KML, KMZ, TCX, FIT or CSV
+          to add them.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <Button onClick={() => actions.startDrawingRoute()}>New Route</Button>
           <Button onClick={() => actions.startPlacingWaypoint()}>
             New Waypoint
+          </Button>
+          <Button onClick={() => void actions.chooseFilesToImport()}>
+            Import…
+          </Button>
+          <Button
+            onClick={() =>
+              actions.openExportDialog({ kind: "trips", tripIds: [trip.id] })
+            }
+          >
+            Export…
           </Button>
         </div>
       </Field>
@@ -193,7 +204,7 @@ function FolderDetails({ folder }: { folder: Folder }): ReactNode {
 }
 
 export function PropertiesPanel(): ReactNode {
-  const { selected, trip, folder, route, waypoint, loading, reload } =
+  const { selected, trip, folder, route, track, waypoint, loading, reload } =
     useSelectionStore();
   const refresh = useLibraryStore((s) => s.refresh);
   const showToast = useUiStore((s) => s.showToast);
@@ -255,8 +266,18 @@ export function PropertiesPanel(): ReactNode {
     return <WaypointProperties waypoint={waypoint} units={settings.units} />;
   }
 
+  if (selected.kind === "track") {
+    if (track === null) {
+      return (
+        <div className="p-4 text-[12px] text-[var(--color-text-muted)]">
+          Loading…
+        </div>
+      );
+    }
+    return <TrackProperties track={track} units={settings.units} />;
+  }
+
   if (selected.kind !== "trip" && selected.kind !== "folder") {
-    // Tracks arrive in Phase 3.
     return (
       <div className="p-4 text-[12px] text-[var(--color-text-secondary)]">
         {selected.kind} properties arrive with that feature in a later phase.

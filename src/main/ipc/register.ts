@@ -1,10 +1,23 @@
+import { writeFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { app, dialog } from 'electron';
 import { CHANNELS } from '@shared/ipc/channels';
 import type { AppInfo, LicenceEntry } from '@shared/ipc/api';
-import type { UndoState } from '@shared/domain/types';
+import type { TrackSegment, UndoState } from '@shared/domain/types';
+import { IMPORT_FORMATS } from '@shared/io/types';
 import * as S from '@shared/ipc/schemas';
 import { EVENTS } from '@shared/ipc/channels';
 import { ctx, reopenDatabase } from '../context';
+import * as historyRepo from '../db/repositories/importHistory';
+import * as exportService from '../io/exportService';
+import * as importService from '../io/importService';
+import * as importSession from '../io/importSession';
+import { readGpx } from '../io/gpx/read';
+import { readKml } from '../io/kml/read';
+import { readTcx } from '../io/tcx/read';
+import { readCsv } from '../io/csv/read';
+import { ServiceError } from '../services/errors';
+import * as trackService from '../services/trackService';
 import * as backupService from '../services/backupService';
 import * as folderService from '../services/folderService';
 import type { Mutation } from '../services/folderService';
@@ -22,6 +35,52 @@ import { handle, handleNoArgs } from './handler';
 import { RUNTIME_NOTICES, THIRD_PARTY_LICENCES } from '../licences';
 
 const REPOSITORY_URL = 'https://github.com/trailrt/trailrt';
+
+/**
+ * Re-reads the retained original bytes of a track to recover its geometry.
+ *
+ * Only the synchronous text formats are handled. KMZ and FIT are async, and
+ * threading a promise through `restoreOriginal` would make the whole mutation
+ * path async for one recovery case — so those are refused with an explanation
+ * rather than half-supported. Re-importing the file is the alternative, and it
+ * works today.
+ */
+function reparseTrackSegments(
+  format: string,
+  bytes: Uint8Array,
+): readonly TrackSegment[] {
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  const source = `original.${format}`;
+
+  const parsed = (() => {
+    switch (format) {
+      case 'gpx':
+        return readGpx(text, source);
+      case 'kml':
+        return readKml(text, source);
+      case 'tcx':
+        return readTcx(text, source);
+      case 'csv':
+        return readCsv(text, source);
+      default:
+        throw new ServiceError(
+          'INVALID_REQUEST',
+          `Restoring from a retained ${format.toUpperCase()} file is not supported yet. Import the file again instead.`,
+        );
+    }
+  })();
+
+  return parsed.tracks.flatMap((track) =>
+    track.segments.map((segment) => ({
+      points: segment.points.map((point) => ({
+        lat: point.lat,
+        lon: point.lon,
+        ele: point.ele,
+        time: point.time,
+      })),
+    })),
+  );
+}
 
 /**
  * Records a mutation's inverse on the undo stack, tells the renderer the
@@ -59,7 +118,10 @@ function publishUndoState(state: UndoState): void {
 export function registerIpcHandlers(): void {
   // ------------------------------------------------------------- library
   handle(CHANNELS.library.tree, S.libraryTreeRequest, (req) =>
-    libraryService.tree(ctx().handle.db, { includeArchived: req.includeArchived }),
+    libraryService.tree(ctx().handle.db, {
+      includeArchived: req.includeArchived,
+      sortKey: req.sortKey,
+    }),
   );
 
   // --------------------------------------------------------------- trips
@@ -262,6 +324,186 @@ export function registerIpcHandlers(): void {
   handle(CHANNELS.waypoints.createGroup, S.waypointCreateGroupRequest, (req) =>
     commit(waypointService.createGroup(ctx().handle.db, req)),
   );
+
+  // --------------------------------------------------------------- tracks
+  handle(CHANNELS.tracks.listForTrip, S.trackListForTripRequest, (req) =>
+    trackService.listForTrip(ctx().handle.db, req.tripId),
+  );
+
+  handleNoArgs(CHANNELS.tracks.listAll, () =>
+    trackService.listAll(ctx().handle.db),
+  );
+
+  handle(CHANNELS.tracks.get, S.trackGetRequest, (req) =>
+    trackService.get(ctx().handle.db, req.id),
+  );
+
+  handle(CHANNELS.tracks.geometry, S.trackGeometryRequest, (req) =>
+    trackService.geometryFor(ctx().handle.db, req.id, req.zoom),
+  );
+
+  handle(CHANNELS.tracks.update, S.trackUpdateRequest, (req) =>
+    commit(trackService.update(ctx().handle.db, req)),
+  );
+
+  handle(CHANNELS.tracks.move, S.trackMoveRequest, (req) =>
+    commit(trackService.moveToTrip(ctx().handle.db, req)),
+  );
+
+  handle(CHANNELS.tracks.reverse, S.trackReverseRequest, (req) =>
+    commit(trackService.reverse(ctx().handle.db, req.id)),
+  );
+
+  // Read-only: the preview exists so the user sees the cost before agreeing to
+  // it, so it must not record anything on the undo stack.
+  handle(CHANNELS.tracks.previewSimplify, S.trackPreviewSimplifyRequest, (req) =>
+    trackService.previewSimplify(ctx().handle.db, req.id, req.toleranceM),
+  );
+
+  handle(CHANNELS.tracks.simplify, S.trackSimplifyRequest, (req) =>
+    commit(trackService.simplifyTrack(ctx().handle.db, req.id, req.toleranceM)),
+  );
+
+  handle(CHANNELS.tracks.split, S.trackSplitRequest, (req) =>
+    commit(trackService.split(ctx().handle.db, req.id, req.pointIndex)),
+  );
+
+  handle(CHANNELS.tracks.join, S.trackJoinRequest, (req) =>
+    commit(trackService.join(ctx().handle.db, req)),
+  );
+
+  handle(CHANNELS.tracks.deleteRange, S.trackDeleteRangeRequest, (req) =>
+    commit(
+      trackService.deletePointRange(ctx().handle.db, req.id, req.from, req.to),
+    ),
+  );
+
+  handle(CHANNELS.tracks.delete, S.trackDeleteRequest, (req) =>
+    commit(trackService.remove(ctx().handle.db, req.id)),
+  );
+
+  handle(CHANNELS.tracks.hasOriginal, S.trackHasOriginalRequest, (req) => {
+    const original = trackService.originalBytes(ctx().handle.db, req.id);
+    return original === null
+      ? { hasOriginal: false, format: null }
+      : { hasOriginal: true, format: original.format };
+  });
+
+  handle(
+    CHANNELS.tracks.restoreOriginal,
+    S.trackRestoreOriginalRequest,
+    (req) =>
+      commit(
+        trackService.restoreOriginal(
+          ctx().handle.db,
+          req.id,
+          reparseTrackSegments,
+        ),
+      ),
+  );
+
+  // --------------------------------------------------------------- import
+  handleNoArgs(CHANNELS.importing.choose, async () => {
+    const chosen = await dialog.showOpenDialog({
+      title: 'Import',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        {
+          name: 'All supported',
+          extensions: [...IMPORT_FORMATS],
+        },
+        { name: 'GPX', extensions: ['gpx'] },
+        { name: 'KML / KMZ', extensions: ['kml', 'kmz'] },
+        { name: 'TCX', extensions: ['tcx'] },
+        { name: 'FIT', extensions: ['fit'] },
+        { name: 'CSV', extensions: ['csv'] },
+        { name: 'TrailRT collection', extensions: ['json'] },
+      ],
+    });
+    if (chosen.canceled) return [];
+    return importSession.stageFiles(chosen.filePaths);
+  });
+
+  // Paths here come from `webUtils.getPathForFile` in the preload bridge, so
+  // they originate from a real drag-and-drop rather than renderer-side string
+  // construction.
+  handle(CHANNELS.importing.addPaths, S.importAddPathsRequest, (req) =>
+    importSession.stageFiles(req.paths),
+  );
+
+  handle(CHANNELS.importing.commit, S.importCommitRequest, async (req) => {
+    const reports = await importSession.commitStaged(
+      ctx().handle.db,
+      req.files,
+      (progress) => sendToRenderer(EVENTS.importProgress, progress),
+    );
+    // An import is not undoable — it can write hundreds of thousands of rows —
+    // so the stack is left alone and the library is simply refreshed. Deleting
+    // the imported trip is the documented way back.
+    ctx().notifyLibraryChanged();
+    return reports;
+  });
+
+  handle(CHANNELS.importing.discard, S.importDiscardRequest, (req) => {
+    importSession.discard(req.tokens);
+    return true as const;
+  });
+
+  handle(CHANNELS.importing.history, S.importHistoryRequest, (req) =>
+    importService.listHistory(ctx().handle.db, req.limit),
+  );
+
+  handleNoArgs(CHANNELS.importing.clearHistory, () => ({
+    removed: historyRepo.clear(ctx().handle.db),
+  }));
+
+  // --------------------------------------------------------------- export
+  handle(CHANNELS.exporting.options, S.exportOptionsRequest, (req) =>
+    exportService.formatOptions(ctx().handle.db, req.scope),
+  );
+
+  handle(CHANNELS.exporting.run, S.exportRunRequest, async (req) => {
+    const db = ctx().handle.db;
+    // Built before the dialog opens so an unwritable combination is refused
+    // before the user has picked a filename.
+    const result = await exportService.exportScope(db, req.scope, req.format);
+
+    if (result.plan.empty) {
+      throw new ServiceError(
+        'INVALID_REQUEST',
+        `There is nothing ${req.format.toUpperCase()} can carry in this selection.`,
+      );
+    }
+
+    const chosen = await dialog.showSaveDialog({
+      title: 'Export',
+      defaultPath: `${result.plan.suggestedName}.${result.plan.extension}`,
+      filters: [
+        { name: req.format.toUpperCase(), extensions: [result.plan.extension] },
+      ],
+    });
+
+    if (chosen.canceled || chosen.filePath === undefined) {
+      return {
+        cancelled: true,
+        fileName: null,
+        byteSize: null,
+        losses: result.plan.losses,
+      };
+    }
+
+    const payload =
+      result.bytes ?? Buffer.from(result.text ?? '', 'utf8');
+    await writeFile(chosen.filePath, payload);
+
+    return {
+      cancelled: false,
+      // Basename only: the renderer gets a label to display, not a location.
+      fileName: basename(chosen.filePath),
+      byteSize: payload.byteLength,
+      losses: result.plan.losses,
+    };
+  });
 
   // ------------------------------------------------------------- geometry
   handle(CHANNELS.geometry.forTrip, S.geometryForTripRequest, (req) =>

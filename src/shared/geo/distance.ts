@@ -79,6 +79,12 @@ export function elevationStats(points: readonly LatLonEle[]): ElevationStats {
 
   let gain = 0;
   let loss = 0;
+  // Min and max are folded in the same pass rather than via `Math.min(...xs)`:
+  // spreading a 200,000-element array exceeds the call stack, which a recorded
+  // track reaches easily.
+  let min = elevations[0] as number;
+  let max = min;
+
   for (let i = 1; i < elevations.length; i += 1) {
     const prev = elevations[i - 1];
     const curr = elevations[i];
@@ -86,14 +92,11 @@ export function elevationStats(points: readonly LatLonEle[]): ElevationStats {
     const delta = curr - prev;
     if (delta > 0) gain += delta;
     else loss -= delta;
+    if (curr < min) min = curr;
+    if (curr > max) max = curr;
   }
 
-  return {
-    gain,
-    loss,
-    min: Math.min(...elevations),
-    max: Math.max(...elevations),
-  };
+  return { gain, loss, min, max };
 }
 
 export interface BoundingBox {

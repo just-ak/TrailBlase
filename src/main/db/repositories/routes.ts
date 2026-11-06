@@ -8,6 +8,7 @@ import type {
 } from '@shared/domain/types';
 import type { RouteWithTrip } from '@shared/ipc/api';
 import type { Db } from '../client';
+import { encodeMetadata } from '../metadata';
 import { routePoints, routes, trips } from '../schema';
 
 /** Data access for routes and their points. Invariants live in the service. */
@@ -92,6 +93,8 @@ export interface InsertRouteValues {
   name: string;
   colour: string | null;
   source: GeometrySource;
+  /** Imported fields with no column of their own. See db/metadata.ts. */
+  metadata?: Record<string, unknown> | undefined;
   now: number;
 }
 
@@ -104,6 +107,7 @@ export function insertRoute(db: Db, values: InsertRouteValues): Route {
       name: values.name,
       colour: values.colour,
       source: values.source,
+      metadata: encodeMetadata(values.metadata),
       createdAt: values.now,
       updatedAt: values.now,
     })

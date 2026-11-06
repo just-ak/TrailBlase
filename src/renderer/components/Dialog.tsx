@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface Props {
   title: string;
@@ -35,8 +35,19 @@ export function Dialog({
       event.preventDefault();
       onClose();
     };
-    node.addEventListener('cancel', onCancel);
-    return () => node.removeEventListener('cancel', onCancel);
+    node.addEventListener("cancel", onCancel);
+
+    return () => {
+      node.removeEventListener("cancel", onCancel);
+      // `close()` on unmount, not just removal from the DOM.
+      //
+      // `showModal()` puts the element in the top layer and makes the rest of
+      // the document inert. React removing the node does not necessarily take
+      // it back out, which leaves the page swallowing every subsequent click —
+      // the app looks frozen after a dialog has been used once. Closing it
+      // explicitly is the documented lifecycle for `<dialog>`.
+      if (node.open) node.close();
+    };
   }, [onClose]);
 
   return (

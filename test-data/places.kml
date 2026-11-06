@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  KML coordinates are "lon,lat,ele" — the opposite order to GPX attributes.
+  Getting this backwards is a classic silent bug, so it has its own test.
+-->
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>KML Sample</name>
+    <Placemark>
+      <name>Refuge</name>
+      <description>A hut, synthetic</description>
+      <ExtendedData>
+        <Data name="capacity"><value>40</value></Data>
+        <Data name="warden"><value>summer only</value></Data>
+      </ExtendedData>
+      <Point>
+        <coordinates>8.0120,46.5197,1850.5</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>No Height Point</name>
+      <Point>
+        <coordinates>7.6586,45.9763</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Ridge Line</name>
+      <LineString>
+        <coordinates>
+          8.0120,46.5197,1850.5
+          8.0255,46.5310,2010
+          8.0431,46.5602,2431
+        </coordinates>
+      </LineString>
+    </Placemark>
+    <Placemark>
+      <name>Two Parts</name>
+      <MultiGeometry>
+        <LineString><coordinates>8.0,46.0,500 8.01,46.01,520</coordinates></LineString>
+        <LineString><coordinates>8.1,46.1,700 8.11,46.11,720</coordinates></LineString>
+      </MultiGeometry>
+    </Placemark>
+  </Document>
+</kml>

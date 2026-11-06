@@ -57,6 +57,8 @@ function Icon({ node }: { node: TreeNode }): ReactNode {
   if (node.kind === "trip") return <span aria-hidden="true">🗺️</span>;
   if (node.kind === "root") return <span aria-hidden="true">📚</span>;
   if (node.kind === "route") return <span aria-hidden="true">〰️</span>;
+  // A recorded track, distinguishable from a drawn route at a glance.
+  if (node.kind === "track") return <span aria-hidden="true">📈</span>;
   if (node.kind === "waypoint") return <span aria-hidden="true">📍</span>;
   return <span aria-hidden="true">🔖</span>;
 }
