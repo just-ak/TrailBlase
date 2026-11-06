@@ -56,9 +56,14 @@ describe('migrations', () => {
   });
 
   it('records every applied version', () => {
-    // Grows as migrations are added; compared against the build's own notion
-    // of current rather than a hardcoded list.
-    expect(handle.migration.applied).toEqual([1, 2]);
+    // Derived from the build's own notion of current rather than hardcoded, so
+    // adding a migration does not require editing this assertion. A hardcoded
+    // list would make every future migration look like a regression here.
+    const expected = Array.from(
+      { length: expectedSchemaVersion() },
+      (_, i) => i + 1,
+    );
+    expect(handle.migration.applied).toEqual(expected);
     expect(handle.migration.schemaVersion).toBe(expectedSchemaVersion());
   });
 
@@ -82,7 +87,8 @@ describe('migrations', () => {
   it('applies nothing new when reopening an existing database', () => {
     const file = join(dir, 'reopen.db');
     const first = createDatabase({ file });
-    expect(first.migration.applied).toEqual([1, 2]);
+    // A fresh database applies everything, whatever "everything" currently is.
+    expect(first.migration.applied).toHaveLength(expectedSchemaVersion());
     first.close();
 
     const second = createDatabase({ file });

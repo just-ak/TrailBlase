@@ -8,7 +8,7 @@ import type {
 } from '@shared/domain/types';
 import type { RouteWithTrip } from '@shared/ipc/api';
 import type { Db } from '../client';
-import { encodeMetadata } from '../metadata';
+import { decodeMetadata, encodeMetadata } from '../metadata';
 import { routePoints, routes, trips } from '../schema';
 
 /** Data access for routes and their points. Invariants live in the service. */
@@ -171,9 +171,18 @@ export function replacePoints(
     notes: point.notes,
   }));
 
-  // One multi-row insert; a per-point statement would be noticeably slower on
-  // a few hundred points and this runs on every drag commit.
-  db.insert(routePoints).values(rows).run();
+  // Chunked for the same reason as replaceTrackPoints: SQLite bounds the
+  // number of bound variables per statement (`SQLITE_MAX_VARIABLE_NUMBER`,
+  // 32,766 by default) and nine columns times a snapped route's point count
+  // exceeds it well before the 10,000-point schema cap. A multi-row insert is
+  // still much faster than a statement per point, which matters because this
+  // runs on every drag commit.
+  const CHUNK = 1000;
+  for (let start = 0; start < rows.length; start += CHUNK) {
+    db.insert(routePoints)
+      .values(rows.slice(start, start + CHUNK))
+      .run();
+  }
 }
 
 /** Writes the derived statistics cache. Always paired with replacePoints. */
@@ -198,6 +207,89 @@ export function writeStats(
     })
     .where(eq(routes.id, routeId))
     .run();
+}
+
+/**
+ * Reads the raw `metadata` JSON for a route.
+ *
+ * Not exposed on the `Route` domain type, which carries only what the UI
+ * displays. Metadata is opaque passenger data — preserved imported fields, and
+ * from Phase 4 the unmatched-leg list — so it is read deliberately by the
+ * services that understand a particular key rather than travelling everywhere.
+ */
+export function readMetadata(
+  db: Db,
+  id: string,
+): Record<string, unknown> {
+  const row = db
+    .select({ metadata: routes.metadata })
+    .from(routes)
+    .where(eq(routes.id, id))
+    .get();
+  return decodeMetadata(row?.metadata);
+}
+
+export function writeMetadata(
+  db: Db,
+  id: string,
+  metadata: Record<string, unknown>,
+): void {
+  db.update(routes)
+    .set({ metadata: encodeMetadata(metadata) })
+    .where(eq(routes.id, id))
+    .run();
+}
+
+/**
+ * Phase 4 snap provenance.
+ *
+ * All three columns move together: a provider with no mode, or a snap time with
+ * no provider, would be a state no reader knows how to interpret. Writing nulls
+ * for all three is how a route returns to hand-drawn.
+ */
+export function writeRoutingProvenance(
+  db: Db,
+  id: string,
+  values: {
+    routingProvider: string | null;
+    transportMode: string | null;
+    snappedAt: number | null;
+  },
+): void {
+  db.update(routes)
+    .set({
+      routingProvider: values.routingProvider,
+      transportMode: values.transportMode,
+      snappedAt: values.snappedAt,
+    })
+    .where(eq(routes.id, id))
+    .run();
+}
+
+export function readRoutingProvenance(
+  db: Db,
+  id: string,
+): {
+  routingProvider: string | null;
+  transportMode: string | null;
+  snappedAt: number | null;
+} | null {
+  const row = db
+    .select({
+      routingProvider: routes.routingProvider,
+      transportMode: routes.transportMode,
+      snappedAt: routes.snappedAt,
+    })
+    .from(routes)
+    .where(eq(routes.id, id))
+    .get();
+
+  if (row === undefined) return null;
+  return {
+    routingProvider: row.routingProvider ?? null,
+    transportMode: row.transportMode ?? null,
+    snappedAt: row.snappedAt ?? null,
+  };
 }
 
 export function countRoutesInTrip(db: Db, tripId: string): number {

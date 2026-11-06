@@ -85,16 +85,84 @@ export const routes = sqliteTable(
     elevLossM: real('elev_loss_m'), // cache
     /**
      * JSON for fields an imported format carried that have no column of their
-     * own — GPX extensions, <url>, KML ExtendedData. Preserved so Phase 5 can
+     * own — GPX extensions, <url>, KML ExtendedData. Preserved so Phase 6 can
      * round-trip them, and reported to the user on import.
+     *
+     * Phase 4 also records `unmatchedLegs` here: control-point index pairs a
+     * routing provider could not match to a road.
      */
     metadata: text('metadata'),
+    /**
+     * Phase 4. Which routing provider produced this geometry, so its origin is
+     * auditable (Requirement 2.4).
+     *
+     * **Null means hand-drawn.** That is what keeps every pre-Phase-4 route
+     * behaving exactly as before without a feature flag.
+     */
+    routingProvider: text('routing_provider'),
+    /** The mode the snap was computed for; the same points snap differently. */
+    transportMode: text('transport_mode'),
+    snappedAt: integer('snapped_at'),
     createdAt: integer('created_at').notNull().default(now),
     updatedAt: integer('updated_at').notNull().default(now),
   },
   (t) => [
     index('idx_routes_trip').on(t.tripId),
     check('routes_source_valid', sql`${t.source} in ('user', 'import')`),
+  ],
+);
+
+/**
+ * Phase 4. The points the user placed, as distinct from the shape that is drawn.
+ *
+ * `route_points` holds the geometry — road shape after a snap, or the user's own
+ * straight lines before one. This table holds intent, which is what makes a
+ * re-snap of one leg possible instead of discarding and redrawing the whole
+ * route. See Requirement 3.3 and the Phase 4 design.
+ *
+ * No rows for a route means it was hand-drawn and never snapped.
+ */
+export const routeControlPoints = sqliteTable(
+  'route_control_points',
+  {
+    id: text('id').primaryKey(),
+    routeId: text('route_id')
+      .notNull()
+      .references(() => routes.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    lat: real('lat').notNull(),
+    lon: real('lon').notNull(),
+  },
+  (t) => [unique('uq_route_control_points_seq').on(t.routeId, t.seq)],
+);
+
+/**
+ * Phase 4. Map-matched road attributes. A cache, never a source of truth.
+ *
+ * `geometryHash` is recomputed from the current geometry on read; a mismatch
+ * means the cache is stale and is discarded. That is how the
+ * invalidate-on-edit rule in `.kiro/steering/architecture.md` is enforced
+ * without a trigger or a hook anyone could forget to call.
+ *
+ * `fetchedAt` is displayed with the data, so cached attributes shown while a
+ * provider is unreachable carry their age rather than looking current.
+ */
+export const roadAttributes = sqliteTable(
+  'road_attributes',
+  {
+    id: text('id').primaryKey(),
+    /** 'route' or 'track'. Tracks are matched for reading only. */
+    ownerType: text('owner_type').notNull(),
+    ownerId: text('owner_id').notNull(),
+    provider: text('provider').notNull(),
+    geometryHash: text('geometry_hash').notNull(),
+    fetchedAt: integer('fetched_at').notNull(),
+    /** JSON: per-edge speed limit, road class and surface. */
+    payload: text('payload').notNull(),
+  },
+  (t) => [
+    unique('uq_road_attributes_owner').on(t.ownerType, t.ownerId),
+    index('idx_road_attributes_fetched').on(t.fetchedAt),
   ],
 );
 

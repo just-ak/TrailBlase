@@ -60,8 +60,20 @@ test.describe('route drawing', () => {
       .click({ button: 'right' });
     await page.getByRole('menuitem', { name: 'New Route' }).click();
 
-    // The hint bar must be explicit that nothing is snapped to a path.
-    await expect(page.getByText(/not snapped to paths/i)).toBeVisible();
+    /*
+     * The hint bar must be explicit that nothing is snapped to a road.
+     *
+     * With no routing service configured — which is the default and the state
+     * these tests run in — the wording names the reason rather than merely
+     * stating the fact. Phase 4 added the snap toggle, and it is deliberately
+     * absent here: a control that cannot work must not be shown.
+     */
+    await expect(
+      page.getByText(/no routing service configured/i),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /snap to roads/i }),
+    ).toHaveCount(0);
 
     await clickMap(page, 240, 200);
     await clickMap(page, 330, 260);

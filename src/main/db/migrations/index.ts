@@ -1,5 +1,6 @@
 import initial from './0000_initial.sql?raw';
 import addObjectMetadata from './0001_add_object_metadata.sql?raw';
+import routingAndAttributes from './0002_routing_and_attributes.sql?raw';
 
 export interface Migration {
   /** Monotonic. Recorded in `schema_migrations` once applied. */
@@ -20,6 +21,9 @@ export const MIGRATIONS: readonly Migration[] = [
   // Phase 3: routes, tracks and waypoints gain a metadata column so imported
   // fields with no column of their own are preserved rather than dropped.
   { version: 2, name: '0001_add_object_metadata', sql: addObjectMetadata },
+  // Phase 4: snap-to-road provenance on routes, the control points the user
+  // placed, and the map-matched road-attribute cache.
+  { version: 3, name: '0002_routing_and_attributes', sql: routingAndAttributes },
 ];
 
 /** drizzle-kit's statement separator. */

@@ -158,7 +158,7 @@ describe('readTcx', () => {
     expect(empty.warnings).toContain('This TCX file contains no activities.');
   });
 
-  it('keeps the Creator block for Phase 5 round-tripping', () => {
+  it('keeps the Creator block for Phase 6 round-tripping', () => {
     const withCreator = readTcx(
       wrap(`  <Activities><Activity><Id>2026-01-01T00:00:00Z</Id>
     <Lap><Track><Trackpoint><Position><LatitudeDegrees>46.0</LatitudeDegrees><LongitudeDegrees>8.0</LongitudeDegrees></Position></Trackpoint></Track></Lap>

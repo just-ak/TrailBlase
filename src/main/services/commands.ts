@@ -4,6 +4,7 @@ import { ServiceError } from './errors';
 import * as folderService from './folderService';
 import type { Mutation } from './folderService';
 import * as routeService from './routeService';
+import * as routingService from './routingService';
 import * as tripService from './tripService';
 import * as waypointService from './waypointService';
 
@@ -34,6 +35,7 @@ export type CommandKind =
   | 'route:move'
   | 'route:delete'
   | 'route:restore'
+  | 'route:restoreSnap'
   | 'waypoint:update'
   | 'waypoint:restorePosition'
   | 'waypoint:moveBack'
@@ -61,6 +63,8 @@ const LABELS: Record<CommandKind, string> = {
   'route:move': 'route move',
   'route:delete': 'route delete',
   'route:restore': 'route delete',
+  // Named for what undoing it does, which is what the Edit menu shows.
+  'route:restoreSnap': 'snap to roads',
   'waypoint:update': 'waypoint edit',
   'waypoint:restorePosition': 'waypoint move',
   'waypoint:moveBack': 'waypoint move',
@@ -186,6 +190,28 @@ const HANDLERS: Record<CommandKind, Handler> = {
     routeService.moveToTrip(db, { id: str(p, 'id'), tripId: str(p, 'tripId') }),
 
   'route:delete': (db, p) => routeService.remove(db, str(p, 'id')),
+
+  /*
+   * Restores a route's pre-snap geometry *and* its control-point state.
+   *
+   * `controlPoints: null` means the route was hand-drawn before the snap, and
+   * restoring it must clear the control points rather than leave orphans — a
+   * route with control points but no provider is a state no reader expects.
+   */
+  'route:restoreSnap': (db, p) =>
+    routingService.restoreSnap(db, {
+      id: str(p, 'id'),
+      points: points(p),
+      controlPoints: Array.isArray(p.controlPoints)
+        ? (p.controlPoints as { lat: number; lon: number }[])
+        : null,
+      metadata:
+        typeof p.metadata === 'object' &&
+        p.metadata !== null &&
+        !Array.isArray(p.metadata)
+          ? (p.metadata as Record<string, unknown>)
+          : {},
+    }),
 
   'route:restore': (db, p) =>
     routeService.restore(db, {

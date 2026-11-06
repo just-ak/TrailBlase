@@ -23,7 +23,11 @@ import * as folderService from '../services/folderService';
 import type { Mutation } from '../services/folderService';
 import * as geometryService from '../services/geometryService';
 import * as libraryService from '../services/libraryService';
+import * as profileService from '../services/profileService';
+import * as providerService from '../services/providerService';
+import * as roadAttributeService from '../services/roadAttributeService';
 import * as routeService from '../services/routeService';
+import * as routingService from '../services/routingService';
 import * as settingsService from '../services/settingsService';
 import * as tripService from '../services/tripService';
 import * as undoService from '../services/undoService';
@@ -510,6 +514,123 @@ export function registerIpcHandlers(): void {
     geometryService.forTrip(ctx().handle.db, req.tripId),
   );
 
+  // -------------------------------------------------------------- routing
+  /*
+   * The only handlers in the application that can cause an outbound request.
+   *
+   * `providerService.requireProvider` is the gate: it resolves the endpoint,
+   * re-validates the origin and refuses until consent has been given. Every
+   * network-touching handler below calls it first, so the consent check cannot
+   * be bypassed by reaching a service directly.
+   */
+  handleNoArgs(CHANNELS.routing.status, () =>
+    providerService.status(ctx().handle.db),
+  );
+
+  handle(
+    CHANNELS.routing.consentNotice,
+    S.routingConsentNoticeRequest,
+    (req) => providerService.consentNotice(req.endpoint),
+  );
+
+  handle(CHANNELS.routing.snap, S.routingSnapRequest, async (req) => {
+    const db = ctx().handle.db;
+    const { provider, mode } = providerService.requireProvider(db);
+
+    const mutation = await routingService.snapRoute(db, {
+      routeId: req.routeId,
+      provider,
+      // An explicit mode in the request wins over the stored preference, so
+      // the snap button can offer a one-off mode without writing a setting.
+      mode: req.mode ?? mode,
+      controlPoints: req.controlPoints,
+    });
+
+    /*
+     * The road-attribute cache is dropped rather than left to go stale.
+     *
+     * A snap replaces the geometry, so the cached edges now describe a line
+     * that no longer exists. `geometry_hash` would catch that on the next read
+     * and report it stale, but a stale cache for geometry that was *just*
+     * replaced is noise: the honest state is "not matched yet".
+     */
+    roadAttributeService.clear(db, 'route', req.routeId);
+
+    return commit(mutation);
+  });
+
+  handle(CHANNELS.routing.provenance, S.routingProvenanceRequest, (req) =>
+    routingService.provenance(ctx().handle.db, req.routeId),
+  );
+
+  handle(CHANNELS.routing.match, S.routingMatchRequest, async (req) => {
+    const db = ctx().handle.db;
+    const { provider, mode } = providerService.requireProvider(db);
+
+    return roadAttributeService.match(db, {
+      ownerType: req.ownerType,
+      ownerId: req.ownerId,
+      provider,
+      mode: req.mode ?? mode,
+      force: req.force,
+    });
+  });
+
+  handle(CHANNELS.routing.attributes, S.routingAttributesRequest, (req) =>
+    roadAttributeService.cached(ctx().handle.db, req.ownerType, req.ownerId),
+  );
+
+  handle(
+    CHANNELS.routing.clearAttributes,
+    S.routingClearAttributesRequest,
+    (req) => {
+      roadAttributeService.clear(ctx().handle.db, req.ownerType, req.ownerId);
+      return true as const;
+    },
+  );
+
+  handle(CHANNELS.routing.profile, S.routingProfileRequest, (req) =>
+    profileService.profileFor(ctx().handle.db, {
+      ownerType: req.ownerType,
+      ownerId: req.ownerId,
+      maxSamples: req.maxSamples,
+    }),
+  );
+
+  handle(
+    CHANNELS.routing.speedDistribution,
+    S.routingSpeedDistributionRequest,
+    (req) => {
+      const db = ctx().handle.db;
+      const units = settingsService.all(db).units;
+
+      if (req.source === 'posted') {
+        return roadAttributeService.postedDistribution(
+          db,
+          req.ownerType,
+          req.ownerId,
+          units,
+        );
+      }
+
+      // Recorded speed is a property of a recording. A route is a plan and has
+      // none, which is refused rather than answered with an empty chart.
+      if (req.ownerType !== 'track') {
+        throw new ServiceError(
+          'INVALID_REQUEST',
+          'A route has no recorded speed. It is a plan, not a recording.',
+        );
+      }
+
+      const distribution = roadAttributeService.recordedDistribution(
+        db,
+        req.ownerId,
+        units,
+      );
+      return distribution === null ? null : { distribution, status: null };
+    },
+  );
+
   // ----------------------------------------------------------------- undo
   handleNoArgs(CHANNELS.undo.state, () => undoService.state());
 
@@ -552,5 +673,38 @@ export function registerIpcHandlers(): void {
   handle(CHANNELS.app.openExternal, S.openExternalRequest, async (req) => {
     await openExternal(req.url);
     return true as const;
+  });
+
+  handle(CHANNELS.app.savePng, S.savePngRequest, async (req) => {
+    /*
+     * Validated as base64 before it is decoded.
+     *
+     * `Buffer.from(x, 'base64')` silently skips anything outside the alphabet,
+     * so a malformed payload would be written as a short, corrupt file rather
+     * than refused. Checking first means the failure is a message instead of a
+     * broken image on disk.
+     */
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(req.base64)) {
+      throw new ServiceError(
+        'INVALID_REQUEST',
+        'That image data was not valid, so nothing was written.',
+      );
+    }
+
+    const bytes = Buffer.from(req.base64, 'base64');
+
+    const chosen = await dialog.showSaveDialog({
+      title: 'Save image',
+      defaultPath: `${req.suggestedName}.png`,
+      filters: [{ name: 'PNG image', extensions: ['png'] }],
+    });
+
+    if (chosen.canceled || chosen.filePath === undefined) {
+      return { cancelled: true as const, fileName: null };
+    }
+
+    await writeFile(chosen.filePath, bytes);
+    // Basename only: a label to display, not a location.
+    return { cancelled: false as const, fileName: basename(chosen.filePath) };
   });
 }

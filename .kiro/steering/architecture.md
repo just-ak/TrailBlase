@@ -13,7 +13,7 @@ src/
     db/        drizzle client, migrations, repositories
     services/  use-case layer called by IPC handlers
     ipc/       one module per namespace; validates then delegates
-    io/        import/export (Phase 3+), io/garmin/ (Phase 5)
+    io/        import/export (Phase 3+), io/garmin/ (Phase 6)
     security/  CSP, navigation and permission guards
     menu/      application menu definition
   preload/     contextBridge surface only. No logic.

@@ -99,6 +99,22 @@ export const CHANNELS = {
   geometry: {
     forTrip: 'geometry:forTrip',
   },
+  /**
+   * Routing and road attributes — the only channels that can cause an outbound
+   * network request. `status` and `consentNotice` are local reads, there so the
+   * UI can describe the configuration without triggering a call.
+   */
+  routing: {
+    status: 'routing:status',
+    consentNotice: 'routing:consentNotice',
+    snap: 'routing:snap',
+    provenance: 'routing:provenance',
+    match: 'routing:match',
+    attributes: 'routing:attributes',
+    clearAttributes: 'routing:clearAttributes',
+    profile: 'routing:profile',
+    speedDistribution: 'routing:speedDistribution',
+  },
   undo: {
     state: 'undo:state',
     undo: 'undo:undo',
@@ -109,6 +125,14 @@ export const CHANNELS = {
     info: 'app:info',
     licences: 'app:licences',
     openExternal: 'app:openExternal',
+    /**
+     * Saves a PNG the renderer rendered, through a save dialog.
+     *
+     * The renderer rasterises because only it has a DOM; the main process owns
+     * the dialog and the filesystem. The renderer never receives a path, only
+     * the basename for its confirmation message.
+     */
+    savePng: 'app:savePng',
   },
 } as const;
 

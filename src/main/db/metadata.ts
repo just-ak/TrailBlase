@@ -5,7 +5,7 @@
  * their own — GPX `<extensions>` and `<url>`, KML `ExtendedData`, TCX heart
  * rate, FIT lap summaries. The import-fidelity rule in
  * `.kiro/steering/architecture.md` means they are preserved rather than
- * dropped, and Phase 5 writes them back out.
+ * dropped, and Phase 6 writes them back out.
  *
  * Two conventions, both to keep "no metadata" unambiguous:
  *

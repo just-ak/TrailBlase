@@ -5,10 +5,13 @@ import {
   insertPointAt,
   movePoint,
 } from '@shared/geo/routeEdit';
-import { api, call, describeError } from './client';
+import { wazeNavigateUrl } from '@shared/integrations/waze';
+import type { SnapOutcome } from '@shared/routing/results';
+import { AppError, api, call, callOr, describeError } from './client';
 import { useEditorStore } from '../stores/editorStore';
 import { useGeometryStore } from '../stores/geometryStore';
 import { useLibraryStore } from '../stores/libraryStore';
+import { useRoutingStore } from '../stores/routingStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useUiStore } from '../stores/uiStore';
 
@@ -417,4 +420,208 @@ export function currentExportScope(): ExportScopeRequest | null {
   }
   const tripId = currentTripId();
   return tripId === null ? null : { kind: 'trips', tripIds: [tripId] };
+}
+
+// ------------------------------------------- routing, road attributes, Waze
+
+/**
+ * Snapping, matching and the Waze hand-off.
+ *
+ * Every function here is started by a user gesture. Nothing in this section is
+ * called from a render path or an effect that runs on selection, because all of
+ * it can cause an outbound network request and the consent the user gave was
+ * for actions they take, not for the app to poll on their behalf.
+ */
+
+/** Resolves the editor into measuring mode. Creates nothing, ever. */
+export function startMeasuring(): void {
+  useEditorStore.getState().startMeasure();
+  toast('Measuring. Click to add points — nothing is saved.');
+}
+
+/**
+ * Turns a provider failure into a message the user can act on.
+ *
+ * The three unavailable states need three different responses, and the IPC
+ * error codes keep them distinguishable: open settings, fix the endpoint, or
+ * accept the consent prompt.
+ */
+function routingFailure(cause: unknown): void {
+  const message = describeError(cause);
+  if (cause instanceof AppError && cause.code === 'CONSENT_REQUIRED') {
+    toast(message, 'error');
+    useUiStore.getState().openDialog({ kind: 'settings' });
+    return;
+  }
+  if (cause instanceof AppError && cause.code === 'PROVIDER_UNAVAILABLE') {
+    toast(
+      'No routing service is configured. Add one in Settings to snap routes to roads.',
+      'error',
+    );
+    return;
+  }
+  toast(message, 'error');
+}
+
+/**
+ * Snaps a route to the road network.
+ *
+ * Returns the outcome so the caller can describe it. An unmatched leg is not a
+ * failure: the route is still snapped everywhere a road was found, and the
+ * straight sections are reported.
+ */
+export async function snapRoute(
+  routeId: string,
+): Promise<SnapOutcome | null> {
+  const routing = useRoutingStore.getState();
+  routing.setBusy('route', routeId, true);
+
+  try {
+    const outcome = await call(api().routing.snap({ routeId }));
+    routing.invalidate('route', routeId);
+    await refreshAll();
+
+    const unmatched = outcome.unmatchedLegs.length;
+    if (unmatched > 0) {
+      toast(
+        `Snapped to ${outcome.pointCount.toLocaleString()} points. ${unmatched} section${
+          unmatched === 1 ? '' : 's'
+        } had no road route and stayed straight.`,
+      );
+    } else if (outcome.undoable) {
+      toast(
+        `Snapped to roads — ${outcome.pointCount.toLocaleString()} points. Undo with ⌘Z.`,
+      );
+    } else {
+      // Said plainly rather than implying an undo that is not on the stack.
+      toast(
+        `Snapped to roads — ${outcome.pointCount.toLocaleString()} points. This one cannot be undone; the previous shape was too large to keep.`,
+      );
+    }
+    return outcome;
+  } catch (cause) {
+    routingFailure(cause);
+    return null;
+  } finally {
+    useRoutingStore.getState().setBusy('route', routeId, false);
+  }
+}
+
+/**
+ * Creates a route from drawn points, snapping it when the user asked for that.
+ *
+ * The route is created first and snapped second, deliberately. If the provider
+ * is unreachable the user keeps the route they drew instead of losing the
+ * gesture entirely — which is what a single create-and-snap call would do.
+ */
+export async function createRouteFromDrawnPoints(
+  tripId: string,
+  points: readonly RoutePoint[],
+  snap: boolean,
+): Promise<void> {
+  if (points.length === 0) {
+    toast('Nothing to save — place at least one point.', 'error');
+    return;
+  }
+
+  try {
+    const route = await call(
+      api().routes.create({ tripId, name: 'New Route', points: [...points] }),
+    );
+    await refreshAll();
+    await useSelectionStore.getState().select({ kind: 'route', id: route.id });
+
+    if (!snap || points.length < 2) {
+      toast(`Route saved with ${points.length} points.`);
+      return;
+    }
+
+    const outcome = await snapRoute(route.id);
+    if (outcome === null) {
+      toast(
+        'Route saved, but it could not be snapped. It is still the straight-line route you drew.',
+        'error',
+      );
+    }
+  } catch (cause) {
+    toast(describeError(cause), 'error');
+  }
+}
+
+/** Map-matches a geometry to read road attributes. Never moves the geometry. */
+export async function matchRoads(
+  ownerType: 'route' | 'track',
+  ownerId: string,
+  options: { force?: boolean } = {},
+): Promise<boolean> {
+  const routing = useRoutingStore.getState();
+  routing.setBusy(ownerType, ownerId, true);
+
+  try {
+    const status = await call(
+      api().routing.match(
+        options.force === true
+          ? { ownerType, ownerId, force: true }
+          : { ownerType, ownerId },
+      ),
+    );
+
+    routing.invalidate(ownerType, ownerId);
+    await Promise.all([
+      useRoutingStore.getState().loadAttributes(ownerType, ownerId),
+      useRoutingStore.getState().loadProfile(ownerType, ownerId),
+      useRoutingStore
+        .getState()
+        .loadDistribution(ownerType, ownerId, 'posted'),
+    ]);
+
+    if (status.unmatchedPointCount > 0) {
+      toast(
+        `Matched ${status.edgeCount} road segments. ${status.unmatchedPointCount.toLocaleString()} points matched no road and are counted as unknown.`,
+      );
+    } else {
+      toast(`Matched ${status.edgeCount} road segments.`);
+    }
+    return true;
+  } catch (cause) {
+    routingFailure(cause);
+    return false;
+  } finally {
+    useRoutingStore.getState().setBusy(ownerType, ownerId, false);
+  }
+}
+
+export async function clearRoadAttributes(
+  ownerType: 'route' | 'track',
+  ownerId: string,
+): Promise<void> {
+  await callOr(api().routing.clearAttributes({ ownerType, ownerId }), true);
+  useRoutingStore.getState().invalidate(ownerType, ownerId);
+  toast('Road data cleared for this geometry.');
+}
+
+/**
+ * Hands a single point to Waze.
+ *
+ * One destination only, because that is all the Waze deep link accepts. The
+ * label the caller built already says "end point" for a route or track, so the
+ * user is not left thinking the whole route went across.
+ */
+export async function openInWaze(point: {
+  lat: number;
+  lon: number;
+}): Promise<void> {
+  try {
+    await call(api().app.openExternal({ url: wazeNavigateUrl(point) }));
+  } catch (cause) {
+    toast(describeError(cause), 'error');
+  }
+}
+
+/** Opens the profile drawer for a geometry. A local read; no provider call. */
+export function openProfile(
+  ownerType: 'route' | 'track',
+  ownerId: string,
+): void {
+  useUiStore.getState().openProfile(ownerType, ownerId);
 }

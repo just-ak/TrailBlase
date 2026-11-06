@@ -87,7 +87,7 @@ interface ImportReport {
 `unmappedMetadata` is the honest half. GPX extensions, TCX heart rate and
 cadence, KML `ExtendedData` — none of these have columns. They are preserved
 verbatim in the `metadata` JSON column and listed in the report, so the user
-knows they survived and Phase 5 can round-trip them. Dropping them silently
+knows they survived and Phase 6 can round-trip them. Dropping them silently
 would breach the steering rule; pretending we understand them would be worse.
 
 Every import, successful or not, is recorded in `import_history`, which is what
@@ -182,7 +182,7 @@ src/
 ```
 
 `main/io/` is a leaf: it depends on `shared/` and the repositories, and nothing
-depends on it except the IPC layer. That is what keeps Phase 5's Garmin work
+depends on it except the IPC layer. That is what keeps Phase 6's Garmin work
 from reaching into trip management.
 
 ## Technical risks
@@ -201,5 +201,5 @@ from reaching into trip management.
 ## Out of scope for Phase 3
 
 Elevation profile charts and routing remain Phase 4. GDB, IMG and device
-transfer remain Phase 5 investigations. TCX and FIT writing is not planned at
+transfer remain Phase 6 investigations. TCX and FIT writing is not planned at
 all, for the fabrication reason above.

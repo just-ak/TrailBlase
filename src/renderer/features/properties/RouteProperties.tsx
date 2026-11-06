@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
-import type { RouteWithPoints, UnitSystem } from '@shared/domain/types';
-import { ROUTE_COLOURS, routeColour } from '@shared/domain/symbols';
+import { useState, type ReactNode } from "react";
+import type { RouteWithPoints, UnitSystem } from "@shared/domain/types";
+import { ROUTE_COLOURS, routeColour } from "@shared/domain/symbols";
 import {
   estimateDurationSeconds,
   formatCoordinates,
@@ -8,10 +8,12 @@ import {
   formatDuration,
   formatElevation,
   formatTimestamp,
-} from '@shared/geo/units';
-import * as actions from '../../lib/actions';
-import { Button } from '../../components/Button';
-import { Field, INPUT_CLASS, ReadOnly } from './fields';
+} from "@shared/geo/units";
+import * as actions from "../../lib/actions";
+import { Button } from "../../components/Button";
+import { Field, INPUT_CLASS, ReadOnly } from "./fields";
+import { RoadDataSection } from "./RoadDataSection";
+import { WazeButton } from "./WazeButton";
 
 /**
  * Route inspector.
@@ -53,7 +55,8 @@ export function RouteProperties({
               setName(route.name);
               return;
             }
-            if (trimmed !== route.name) void actions.renameRoute(route.id, trimmed);
+            if (trimmed !== route.name)
+              void actions.renameRoute(route.id, trimmed);
           }}
           className={INPUT_CLASS}
         />
@@ -72,8 +75,8 @@ export function RouteProperties({
               style={{ background: option.hex }}
               className={`h-6 w-6 rounded-full border-2 ${
                 routeColour(route.colour) === option.hex
-                  ? 'border-[var(--color-text-primary)]'
-                  : 'border-transparent'
+                  ? "border-[var(--color-text-primary)]"
+                  : "border-transparent"
               }`}
             />
           ))}
@@ -92,13 +95,13 @@ export function RouteProperties({
 
       <Field label="Start">
         <ReadOnly
-          value={first === null ? '—' : formatCoordinates(first.lat, first.lon)}
+          value={first === null ? "—" : formatCoordinates(first.lat, first.lon)}
         />
       </Field>
 
       <Field label="End">
         <ReadOnly
-          value={last === null ? '—' : formatCoordinates(last.lat, last.lon)}
+          value={last === null ? "—" : formatCoordinates(last.lat, last.lon)}
         />
       </Field>
 
@@ -117,7 +120,7 @@ export function RouteProperties({
             <li>Gain {formatElevation(route.elevGainM, units)}</li>
             <li>Loss {formatElevation(route.elevLossM, units)}</li>
             <li>
-              Range {formatElevation(route.elevMinM, units)} –{' '}
+              Range {formatElevation(route.elevMinM, units)} –{" "}
               {formatElevation(route.elevMaxM, units)}
             </li>
           </ul>
@@ -131,19 +134,43 @@ export function RouteProperties({
       <div className="my-4 h-px bg-[var(--color-border-subtle)]" />
 
       <Field label="Source">
-        <ReadOnly value={route.source === 'import' ? 'Imported' : 'Drawn here'} />
+        <ReadOnly
+          value={route.source === "import" ? "Imported" : "Drawn here"}
+        />
       </Field>
 
       <Field label="Last modified">
         <ReadOnly value={formatTimestamp(route.updatedAt)} />
       </Field>
 
+      <RoadDataSection
+        ownerType="route"
+        ownerId={route.id}
+        units={units}
+        pointCount={route.pointCount}
+      />
+
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button onClick={() => void actions.reverseRoute(route.id)}>Reverse</Button>
+        <Button onClick={() => void actions.reverseRoute(route.id)}>
+          Reverse
+        </Button>
         <Button onClick={() => void actions.duplicateRoute(route.id)}>
           Duplicate
         </Button>
-        <Button variant="danger" onClick={() => void actions.deleteRoute(route.id)}>
+        <Button onClick={() => actions.openProfile("route", route.id)}>
+          Profile
+        </Button>
+        <WazeButton
+          selection={{
+            kind: "route",
+            name: route.name,
+            points: route.points.map((p) => ({ lat: p.lat, lon: p.lon })),
+          }}
+        />
+        <Button
+          variant="danger"
+          onClick={() => void actions.deleteRoute(route.id)}
+        >
           Delete
         </Button>
       </div>

@@ -50,7 +50,7 @@ The SDK licence must be read and recorded in this ADR before the dependency is
 added. If its terms do not permit redistribution in a packaged desktop app,
 fall back to `fit-file-parser` (MIT).
 
-**Investigate only, do not implement** (Phase 5): GDB and IMG. The deliverable
+**Investigate only, do not implement** (Phase 6): GDB and IMG. The deliverable
 is a written findings document covering file structure, available tooling and
 licensing — not a parser.
 

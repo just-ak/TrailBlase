@@ -11,8 +11,9 @@ import { pendingPointIcon } from './markers';
  * guarding inside it is how phantom points appear after finishing.
  *
  * Segments are drawn as straight dashed lines. Dashed is deliberate: it signals
- * that nothing has been snapped to a road, which no provider does until Phase 4
- * (Requirement 1.5).
+ * that nothing has been snapped to a road yet (Requirement 1.5). That remains
+ * true after Phase 4 — snapping happens when the route is finished, not while
+ * it is being drawn, so the preview is always the straight-line version.
  */
 
 interface Options {

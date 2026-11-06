@@ -90,6 +90,9 @@ test.describe('security posture', () => {
       'importing',
       'library',
       'routes',
+      // Phase 4. The only namespace that can cause an outbound request, and
+      // every call in it is gated on an explicitly configured, consented host.
+      'routing',
       'settings',
       'tracks',
       'trips',

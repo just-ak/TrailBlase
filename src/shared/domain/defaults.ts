@@ -12,6 +12,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   units: 'metric',
   mapProviderId: 'osm',
+  mapOverlayId: '',
+  customTileUrl: '',
+  customOverlayUrl: '',
+  // No routing service by default. This is the setting that keeps the
+  // application fully functional with no network at all.
+  routingEndpoint: '',
+  routingConsentAccepted: false,
+  transportMode: 'auto',
+  showScaleBar: true,
+  layerVisibility: { routes: true, tracks: true, waypoints: true },
   backupIntervalHours: 24,
   backupRetention: 7,
   planningSpeedKmh: 4.5,

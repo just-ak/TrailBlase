@@ -1,4 +1,5 @@
 import { shell, type BrowserWindow } from 'electron';
+import { ServiceError } from '../services/errors';
 
 /**
  * Navigation and external-link containment.
@@ -51,11 +52,22 @@ export function checkExternalUrl(raw: string): ExternalUrlCheck {
   return { allowed: true };
 }
 
-/** Opens a validated URL in the system browser, never in an app window. */
+/**
+ * Opens a validated URL in the system browser, never in an app window.
+ *
+ * Throws a `ServiceError` rather than a plain `Error` so the reason survives
+ * the IPC boundary. `toErrorShape` maps an unrecognised `Error` to
+ * `UNKNOWN: "Something went wrong."` and tucks the real text into `detail`,
+ * which meant a blocked host produced a message the user could do nothing
+ * with. The refusal is a request problem and says which host was refused.
+ */
 export async function openExternal(raw: string): Promise<void> {
   const check = checkExternalUrl(raw);
   if (!check.allowed) {
-    throw new Error(check.reason ?? 'That link cannot be opened.');
+    throw new ServiceError(
+      'INVALID_REQUEST',
+      check.reason ?? 'That link cannot be opened.',
+    );
   }
   await shell.openExternal(raw);
 }

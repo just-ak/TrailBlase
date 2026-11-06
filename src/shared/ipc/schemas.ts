@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { checkRoutingOrigin } from '../net/origin';
 
 /**
  * Request schemas for every IPC channel. The main process validates against
@@ -21,6 +22,21 @@ export const tripSortKeySchema = z.enum(['name', 'updatedAt', 'createdAt']);
 export const sortDirectionSchema = z.enum(['asc', 'desc']);
 
 export const emptySchema = z.object({}).strict();
+
+export const transportModeSchema = z.enum([
+  'auto',
+  'motorcycle',
+  'bicycle',
+  'pedestrian',
+]);
+
+export const layerVisibilitySchema = z
+  .object({
+    routes: z.boolean(),
+    tracks: z.boolean(),
+    waypoints: z.boolean(),
+  })
+  .strict();
 
 // ---------------------------------------------------------------- library
 
@@ -180,6 +196,65 @@ export const settingsSetRequest = z.discriminatedUnion('key', [
     })
     .strict(),
   z.object({ key: z.literal('mapPosition'), value: mapPositionSchema }).strict(),
+
+  // ------------------------------------------------- Phase 4: mapping, routing
+
+  z
+    .object({ key: z.literal('mapOverlayId'), value: z.string().max(64) })
+    .strict(),
+  /*
+   * A tile template, not a URL: it contains `{z}/{x}/{y}` placeholders, so it
+   * cannot be validated with `z.url()`. Length-bounded here and resolved to an
+   * origin by `tileTemplateOrigin`, which is what decides whether it
+   * contributes a CSP entry.
+   */
+  z
+    .object({ key: z.literal('customTileUrl'), value: z.string().max(2048) })
+    .strict(),
+  z
+    .object({ key: z.literal('customOverlayUrl'), value: z.string().max(2048) })
+    .strict(),
+  /*
+   * The routing endpoint. An empty string is valid and means "no provider",
+   * which is the default and the state in which the app needs no network.
+   *
+   * Anything else must satisfy `checkRoutingOrigin` — https anywhere, http
+   * only for loopback, no credentials. Validating it here rather than only in
+   * the handler means the renderer can reject a bad endpoint in the settings
+   * field before it is ever sent, and the main process still re-checks it when
+   * it builds the CSP and when it makes a request. The schema is the first of
+   * three gates, not the only one.
+   */
+  z
+    .object({
+      key: z.literal('routingEndpoint'),
+      value: z
+        .string()
+        .max(2048)
+        .superRefine((value, ctx) => {
+          if (value.trim().length === 0) return;
+          const check = checkRoutingOrigin(value);
+          if (check.ok) return;
+          ctx.addIssue({
+            code: 'custom',
+            // The policy's own message, so the user is told which rule they
+            // broke rather than "invalid input".
+            message:
+              check.message ?? 'That routing endpoint is not acceptable.',
+          });
+        }),
+    })
+    .strict(),
+  z
+    .object({ key: z.literal('routingConsentAccepted'), value: z.boolean() })
+    .strict(),
+  z
+    .object({ key: z.literal('transportMode'), value: transportModeSchema })
+    .strict(),
+  z.object({ key: z.literal('showScaleBar'), value: z.boolean() }).strict(),
+  z
+    .object({ key: z.literal('layerVisibility'), value: layerVisibilitySchema })
+    .strict(),
   z
     .object({
       key: z.literal('expandedNodeIds'),
@@ -528,3 +603,98 @@ export const exportRunRequest = z
 export type TrackUpdateRequest = z.infer<typeof trackUpdateRequest>;
 export type ImportFileSelection = z.infer<typeof importFileSelectionSchema>;
 export type ExportScopeRequest = z.infer<typeof exportScopeSchema>;
+
+// --------------------------------------------- Phase 4: routing, attributes
+
+/**
+ * Which geometry a road-attribute or profile request is about.
+ *
+ * A single owner type plus id rather than separate route and track channels:
+ * the services treat them uniformly, and duplicating every channel would
+ * double the surface for no gain.
+ */
+export const attributeOwnerSchema = z
+  .object({
+    ownerType: z.enum(['route', 'track']),
+    ownerId: idSchema,
+  })
+  .strict();
+
+export const transportModeRequestSchema = transportModeSchema.optional();
+
+/**
+ * Snapping an existing route.
+ *
+ * `controlPoints` is optional and bounded by the same 10,000 as
+ * `routePointsSchema`, because when the renderer supplies them it is handing
+ * over an array that becomes an undo payload. Omitting it is the normal case:
+ * the service then uses the route's stored control points, or its current
+ * geometry if it has never been snapped.
+ */
+export const routingSnapRequest = z
+  .object({
+    routeId: idSchema,
+    mode: transportModeRequestSchema,
+    controlPoints: z
+      .array(z.object({ lat: latSchema, lon: lonSchema }).strict())
+      .min(2)
+      .max(10_000)
+      .optional(),
+  })
+  .strict();
+
+export const routingProvenanceRequest = z
+  .object({ routeId: idSchema })
+  .strict();
+
+export const routingMatchRequest = attributeOwnerSchema.extend({
+  mode: transportModeRequestSchema,
+  /** Re-match even when the cache is fresh. An explicit user refresh. */
+  force: z.boolean().optional(),
+});
+
+export const routingAttributesRequest = attributeOwnerSchema;
+export const routingClearAttributesRequest = attributeOwnerSchema;
+
+export const routingProfileRequest = attributeOwnerSchema.extend({
+  maxSamples: z.number().int().min(2).max(5000).optional(),
+});
+
+/**
+ * Speed distribution.
+ *
+ * `source` is required rather than defaulted, because posted limits and
+ * recorded speeds are different facts and ADR 0011 forbids merging them. A
+ * caller has to say which one it is asking for, so a UI cannot drift into
+ * showing one labelled as the other.
+ */
+export const routingSpeedDistributionRequest = attributeOwnerSchema.extend({
+  source: z.enum(['posted', 'recorded']),
+});
+
+export const routingConsentNoticeRequest = z
+  .object({ endpoint: z.string().max(2048) })
+  .strict();
+
+export type RoutingSnapRequest = z.infer<typeof routingSnapRequest>;
+export type RoutingMatchRequest = z.infer<typeof routingMatchRequest>;
+export type RoutingProfileRequest = z.infer<typeof routingProfileRequest>;
+export type RoutingSpeedDistributionRequest = z.infer<
+  typeof routingSpeedDistributionRequest
+>;
+export type AttributeOwnerRequest = z.infer<typeof attributeOwnerSchema>;
+
+/**
+ * A PNG the renderer rendered, on its way to a save dialog.
+ *
+ * Base64 rather than a `Uint8Array`: the context bridge clones structured data,
+ * and a string survives that unambiguously where a typed array's backing buffer
+ * is easy to get wrong. Capped at 8 MB of base64 — about 6 MB of image, far
+ * above a chart and low enough that a bug cannot wedge the main process.
+ */
+export const savePngRequest = z
+  .object({
+    suggestedName: z.string().min(1).max(120),
+    base64: z.string().min(1).max(8_000_000),
+  })
+  .strict();

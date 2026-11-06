@@ -35,7 +35,7 @@ band so the summary matches the nodes.
 Mark a task `done` only when it is verified — tests passing or behaviour
 confirmed — not when the code is merely written. `investigation` is for work
 whose deliverable is a documented finding rather than a feature, which is most
-of Phase 5.
+of Phase 6, and part of Phase 5.
 
 After editing, render it to confirm it still displays correctly, and surface it
 in chat as an artifact so the user sees the current state without opening a

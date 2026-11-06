@@ -1,12 +1,13 @@
-import { useState, type ReactNode } from 'react';
-import type { UnitSystem, Waypoint } from '@shared/domain/types';
-import { isKnownSymbol, WAYPOINT_SYMBOLS } from '@shared/domain/symbols';
-import { formatElevation, formatTimestamp } from '@shared/geo/units';
-import { isValidLat, isValidLon } from '@shared/geo/distance';
-import { Button } from '../../components/Button';
-import * as actions from '../../lib/actions';
-import { useUiStore } from '../../stores/uiStore';
-import { Field, INPUT_CLASS, ReadOnly } from './fields';
+import { useState, type ReactNode } from "react";
+import type { UnitSystem, Waypoint } from "@shared/domain/types";
+import { isKnownSymbol, WAYPOINT_SYMBOLS } from "@shared/domain/symbols";
+import { formatElevation, formatTimestamp } from "@shared/geo/units";
+import { isValidLat, isValidLon } from "@shared/geo/distance";
+import { Button } from "../../components/Button";
+import * as actions from "../../lib/actions";
+import { useUiStore } from "../../stores/uiStore";
+import { Field, INPUT_CLASS, ReadOnly } from "./fields";
+import { WazeButton } from "./WazeButton";
 
 /**
  * Waypoint inspector.
@@ -28,22 +29,22 @@ export function WaypointProperties({
   const [lat, setLat] = useState(String(waypoint.lat));
   const [lon, setLon] = useState(String(waypoint.lon));
   const [elevation, setElevation] = useState(
-    waypoint.eleM === null ? '' : String(waypoint.eleM),
+    waypoint.eleM === null ? "" : String(waypoint.eleM),
   );
-  const [description, setDescription] = useState(waypoint.description ?? '');
-  const [notes, setNotes] = useState(waypoint.notes ?? '');
+  const [description, setDescription] = useState(waypoint.description ?? "");
+  const [notes, setNotes] = useState(waypoint.notes ?? "");
 
   const commitCoordinates = (): void => {
     const nextLat = Number(lat);
     const nextLon = Number(lon);
 
     if (!isValidLat(nextLat)) {
-      showToast('Latitude must be a number between -90 and 90.', 'error');
+      showToast("Latitude must be a number between -90 and 90.", "error");
       setLat(String(waypoint.lat));
       return;
     }
     if (!isValidLon(nextLon)) {
-      showToast('Longitude must be a number between -180 and 180.', 'error');
+      showToast("Longitude must be a number between -180 and 180.", "error");
       setLon(String(waypoint.lon));
       return;
     }
@@ -62,8 +63,11 @@ export function WaypointProperties({
     }
     const value = Number(trimmed);
     if (!Number.isFinite(value) || value < -500 || value > 12_000) {
-      showToast('Elevation must be a number of metres between -500 and 12000.', 'error');
-      setElevation(waypoint.eleM === null ? '' : String(waypoint.eleM));
+      showToast(
+        "Elevation must be a number of metres between -500 and 12000.",
+        "error",
+      );
+      setElevation(waypoint.eleM === null ? "" : String(waypoint.eleM));
       return;
     }
     if (value !== waypoint.eleM) {
@@ -71,7 +75,7 @@ export function WaypointProperties({
     }
   };
 
-  const currentSymbol = waypoint.symbol ?? 'pin';
+  const currentSymbol = waypoint.symbol ?? "pin";
   const symbolIsImported = !isKnownSymbol(currentSymbol);
 
   return (
@@ -89,7 +93,7 @@ export function WaypointProperties({
             const trimmed = name.trim();
             if (trimmed.length === 0) {
               setName(waypoint.name);
-              showToast('A name cannot be empty.', 'error');
+              showToast("A name cannot be empty.", "error");
               return;
             }
             if (trimmed !== waypoint.name) {
@@ -147,7 +151,7 @@ export function WaypointProperties({
 
       <Field label="Symbol">
         <select
-          value={symbolIsImported ? '' : currentSymbol}
+          value={symbolIsImported ? "" : currentSymbol}
           aria-label="Symbol"
           onChange={(event) =>
             void actions.updateWaypoint(waypoint.id, {
@@ -181,7 +185,7 @@ export function WaypointProperties({
           onChange={(event) => setDescription(event.target.value)}
           onBlur={() => {
             const next = description.trim();
-            if (next !== (waypoint.description ?? '')) {
+            if (next !== (waypoint.description ?? "")) {
               void actions.updateWaypoint(waypoint.id, {
                 description: next.length === 0 ? null : next,
               });
@@ -199,7 +203,7 @@ export function WaypointProperties({
           onChange={(event) => setNotes(event.target.value)}
           onBlur={() => {
             const next = notes.trim();
-            if (next !== (waypoint.notes ?? '')) {
+            if (next !== (waypoint.notes ?? "")) {
               void actions.updateWaypoint(waypoint.id, {
                 notes: next.length === 0 ? null : next,
               });
@@ -213,7 +217,7 @@ export function WaypointProperties({
 
       <Field label="Source">
         <ReadOnly
-          value={waypoint.source === 'import' ? 'Imported' : 'Created here'}
+          value={waypoint.source === "import" ? "Imported" : "Created here"}
         />
       </Field>
 
@@ -225,6 +229,13 @@ export function WaypointProperties({
         <Button onClick={() => void actions.duplicateWaypoint(waypoint.id)}>
           Duplicate
         </Button>
+        <WazeButton
+          selection={{
+            kind: "waypoint",
+            name: waypoint.name,
+            point: { lat: waypoint.lat, lon: waypoint.lon },
+          }}
+        />
         <Button
           variant="danger"
           onClick={() => void actions.deleteWaypoint(waypoint.id)}

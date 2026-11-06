@@ -37,6 +37,14 @@ interface UiState {
   dialog: DialogKind;
   toast: { message: string; tone: 'info' | 'error' } | null;
   mapOffline: boolean;
+  /**
+   * The geometry whose profile drawer is open, or null.
+   *
+   * Transient and not persisted: the drawer is a view of the current selection,
+   * and restoring it on launch would mean profiling a geometry before the user
+   * has asked for anything.
+   */
+  profile: { ownerType: 'route' | 'track'; ownerId: string } | null;
 
   hydrate(settings: AppSettings, systemPrefersDark: boolean): void;
   setLayout(patch: Partial<PanelLayout>): void;
@@ -49,6 +57,8 @@ interface UiState {
   showToast(message: string, tone?: 'info' | 'error'): void;
   dismissToast(): void;
   setMapOffline(offline: boolean): void;
+  openProfile(ownerType: 'route' | 'track', ownerId: string): void;
+  closeProfile(): void;
   isDark(): boolean;
 }
 
@@ -71,6 +81,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   dialog: { kind: 'none' },
   toast: null,
   mapOffline: false,
+  profile: null,
 
   hydrate: (settings, systemPrefersDark) => {
     set({
@@ -116,6 +127,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   dismissToast: () => set({ toast: null }),
 
   setMapOffline: (mapOffline) => set({ mapOffline }),
+
+  openProfile: (ownerType, ownerId) => set({ profile: { ownerType, ownerId } }),
+  closeProfile: () => set({ profile: null }),
 
   isDark: () => {
     const { theme, systemPrefersDark } = get();

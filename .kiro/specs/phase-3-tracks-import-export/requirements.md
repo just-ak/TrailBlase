@@ -51,7 +51,7 @@ set by ADR 0003.
 5. THE system SHALL export and import a native JSON backup covering the whole
    collection, suitable for migration between installations.
 6. THE system SHALL list GDB as not yet supported with a brief explanation,
-   rather than accepting the file and failing opaquely. GDB is Phase 5 work; it
+   rather than accepting the file and failing opaquely. GDB is Phase 6 work; it
    became viable once the project licence was set to GPL-3.0, which permits
    GPSBabel.
 

@@ -10,6 +10,8 @@
  * - `null` means genuinely absent. It is never a stand-in for zero.
  */
 
+import type { TransportMode } from '../routing/RoutingProvider';
+
 export type Id = string;
 
 /** Epoch milliseconds, UTC. */
@@ -138,6 +140,25 @@ export interface AppSettings {
   theme: ThemePreference;
   units: UnitSystem;
   mapProviderId: string;
+  /** Overlay drawn above the base layer, chosen independently of it. '' = none. */
+  mapOverlayId: string;
+  /** Leaflet template for the `custom` provider. '' until the user sets one. */
+  customTileUrl: string;
+  customOverlayUrl: string;
+  /**
+   * Routing service base URL. **Empty by default**, which is what keeps the
+   * application free of any cloud dependency: with no endpoint there is no
+   * provider, and route drawing behaves exactly as it did in Phase 2.
+   */
+  routingEndpoint: string;
+  /**
+   * Whether the user has accepted that snapping transmits their planned route
+   * to the configured service. Every outbound routing call is gated on this.
+   */
+  routingConsentAccepted: boolean;
+  transportMode: TransportMode;
+  showScaleBar: boolean;
+  layerVisibility: LayerVisibility;
   backupIntervalHours: number;
   backupRetention: number;
   /** Used for route duration estimates. Nothing is estimated without it. */
@@ -152,6 +173,13 @@ export interface AppSettings {
 }
 
 export type SettingsKey = keyof AppSettings;
+
+/** Per-object-kind map visibility. Requirement 4.2. */
+export interface LayerVisibility {
+  routes: boolean;
+  tracks: boolean;
+  waypoints: boolean;
+}
 
 // ------------------------------------------------- Phase 2: routes, waypoints
 

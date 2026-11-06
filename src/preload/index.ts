@@ -150,6 +150,18 @@ const api: TrailRtApi = {
   geometry: {
     forTrip: (req) => call(CHANNELS.geometry.forTrip, req),
   },
+  routing: {
+    status: () => call(CHANNELS.routing.status),
+    consentNotice: (req) => call(CHANNELS.routing.consentNotice, req),
+    snap: (req) => call(CHANNELS.routing.snap, req),
+    provenance: (req) => call(CHANNELS.routing.provenance, req),
+    match: (req) => call(CHANNELS.routing.match, req),
+    attributes: (req) => call(CHANNELS.routing.attributes, req),
+    clearAttributes: (req) => call(CHANNELS.routing.clearAttributes, req),
+    profile: (req) => call(CHANNELS.routing.profile, req),
+    speedDistribution: (req) =>
+      call(CHANNELS.routing.speedDistribution, req),
+  },
   undo: {
     state: () => call(CHANNELS.undo.state),
     undo: () => call(CHANNELS.undo.undo),
@@ -160,6 +172,7 @@ const api: TrailRtApi = {
     info: () => call(CHANNELS.app.info),
     licences: () => call(CHANNELS.app.licences),
     openExternal: (req) => call(CHANNELS.app.openExternal, req),
+    savePng: (req) => call(CHANNELS.app.savePng, req),
   },
   events: {
     onMenuAction: (listener) =>

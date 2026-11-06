@@ -22,6 +22,16 @@ import type {
   ImportReport,
   SkippedItem,
 } from '../io/types';
+import type { SpeedDistribution } from '../geo/speedBands';
+import type { MatchedEdge } from '../routing/RoutingProvider';
+import type {
+  AttributeStatus,
+  ConsentNotice,
+  Profile,
+  RouteProvenance,
+  RoutingStatus,
+  SnapOutcome,
+} from '../routing/results';
 import type { MenuAction } from './channels';
 import type { Result } from './result';
 import type * as S from './schemas';
@@ -229,6 +239,48 @@ export interface TrailRtApi {
       req: Req<typeof S.geometryForTripRequest>,
     ): Promise<Result<TripGeometry>>;
   };
+  /**
+   * Routing and road attributes.
+   *
+   * `status` and `consentNotice` are local reads so the UI can describe the
+   * configuration without causing a request. `snap` and `match` are the only
+   * two calls in the whole application that reach the network, and both refuse
+   * with `CONSENT_REQUIRED` until the user has agreed to the configured host.
+   */
+  routing: {
+    status(): Promise<Result<RoutingStatus>>;
+    consentNotice(
+      req: Req<typeof S.routingConsentNoticeRequest>,
+    ): Promise<Result<ConsentNotice | null>>;
+    snap(req: Req<typeof S.routingSnapRequest>): Promise<Result<SnapOutcome>>;
+    provenance(
+      req: Req<typeof S.routingProvenanceRequest>,
+    ): Promise<Result<RouteProvenance>>;
+    match(
+      req: Req<typeof S.routingMatchRequest>,
+    ): Promise<Result<AttributeStatus>>;
+    attributes(
+      req: Req<typeof S.routingAttributesRequest>,
+    ): Promise<Result<{ status: AttributeStatus; edges: MatchedEdge[] } | null>>;
+    clearAttributes(
+      req: Req<typeof S.routingClearAttributesRequest>,
+    ): Promise<Result<true>>;
+    profile(req: Req<typeof S.routingProfileRequest>): Promise<Result<Profile>>;
+    /**
+     * Posted limits and recorded speeds are separate requests on purpose.
+     * Null means the question cannot be answered for this geometry — no match
+     * yet for `posted`, no timestamps for `recorded` — which is a different
+     * answer from a distribution that is entirely Unknown.
+     */
+    speedDistribution(
+      req: Req<typeof S.routingSpeedDistributionRequest>,
+    ): Promise<
+      Result<{
+        distribution: SpeedDistribution;
+        status: AttributeStatus | null;
+      } | null>
+    >;
+  };
   undo: {
     state(): Promise<Result<UndoState>>;
     undo(): Promise<Result<UndoState>>;
@@ -239,6 +291,9 @@ export interface TrailRtApi {
     info(): Promise<Result<AppInfo>>;
     licences(): Promise<Result<LicenceEntry[]>>;
     openExternal(req: Req<typeof S.openExternalRequest>): Promise<Result<true>>;
+    savePng(
+      req: Req<typeof S.savePngRequest>,
+    ): Promise<Result<{ cancelled: boolean; fileName: string | null }>>;
   };
   events: {
     /** Returns an unsubscribe function. */

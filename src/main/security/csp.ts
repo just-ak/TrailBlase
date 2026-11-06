@@ -1,5 +1,20 @@
 import { session } from 'electron';
 import { allTileHosts } from '@shared/map/MapProvider';
+import { routingConnectOrigin } from '@shared/net/origin';
+
+/**
+ * The network surface the policy permits, derived from settings.
+ *
+ * Passed in rather than read here, so the policy is a pure function of its
+ * inputs and can be unit-tested without Electron or a database.
+ */
+export interface NetworkSurface {
+  /** User-supplied tile template, if the custom provider is configured. */
+  customTileUrl?: string;
+  customOverlayUrl?: string;
+  /** Routing endpoint. Validated; an invalid one contributes nothing. */
+  routingEndpoint?: string;
+}
 
 /**
  * Content-Security-Policy for renderer responses.
@@ -12,20 +27,41 @@ import { allTileHosts } from '@shared/map/MapProvider';
  * tile and marker elements. That is the single relaxation here and it is scoped
  * to styles; `script-src` stays 'self'.
  */
-export function installContentSecurityPolicy(isDev: boolean): void {
-  const tileHosts = allTileHosts().join(' ');
+export function buildCsp(isDev: boolean, surface: NetworkSurface = {}): string {
+  const tileHosts = allTileHosts({
+    ...(surface.customTileUrl === undefined
+      ? {}
+      : { customTileUrl: surface.customTileUrl }),
+    ...(surface.customOverlayUrl === undefined
+      ? {}
+      : { customOverlayUrl: surface.customOverlayUrl }),
+  }).join(' ');
 
   // The Vite dev server and its HMR websocket only exist in development. They
   // must never appear in a packaged build's policy.
   const devScript = isDev ? " 'unsafe-inline'" : '';
   const devConnect = isDev ? ' ws://localhost:* http://localhost:*' : '';
 
-  const policy = [
+  /*
+   * The routing origin is the first and only outbound connection this
+   * application makes. It is validated by `checkRoutingOrigin` — https
+   * anywhere, http only for loopback, no credentials — and an endpoint that
+   * fails validation contributes nothing rather than being passed through.
+   *
+   * Never a wildcard. A provider reaches exactly the origin the user named.
+   */
+  const routingOrigin =
+    surface.routingEndpoint === undefined
+      ? null
+      : routingConnectOrigin(surface.routingEndpoint);
+  const routeConnect = routingOrigin === null ? '' : ` ${routingOrigin}`;
+
+  return [
     "default-src 'self'",
     `script-src 'self'${devScript}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${tileHosts}`,
-    `connect-src 'self'${devConnect}`,
+    `connect-src 'self'${devConnect}${routeConnect}`,
     "font-src 'self' data:",
     "media-src 'none'",
     "object-src 'none'",
@@ -34,7 +70,19 @@ export function installContentSecurityPolicy(isDev: boolean): void {
     "base-uri 'none'",
     "form-action 'none'",
   ].join('; ');
+}
 
+/**
+ * Installs the policy.
+ *
+ * The header is rebuilt from `surface` on every request rather than captured
+ * once, so changing the routing endpoint in settings takes effect on the next
+ * navigation without restarting the app.
+ */
+export function installContentSecurityPolicy(
+  isDev: boolean,
+  readSurface: () => NetworkSurface = () => ({}),
+): void {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     // Only the renderer's own documents and subresources need the policy.
     // Rewriting headers on every request, including tile images served over
@@ -52,7 +100,7 @@ export function installContentSecurityPolicy(isDev: boolean): void {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [policy],
+        'Content-Security-Policy': [buildCsp(isDev, readSurface())],
       },
     });
   });

@@ -55,7 +55,7 @@ the UI. It is not shown as a bare number implying measurement.
 mature implementation is GPSBabel. **Resolution:** initially investigation-only
 under ADR 0006, on the assumption of a proprietary application licence. Revised
 once the licence was set to GPL-3.0 (ADR 0007): GPSBabel is GPL-2.0-or-later and
-therefore compatible, so GDB support is now viable. It remains Phase 5 work, and
+therefore compatible, so GDB support is now viable. It remains Phase 6 work, and
 still may not be advertised until tested against real sample files.
 
 **7. FIT licence gate — resolved against the official SDK.** `@garmin/fitsdk` is

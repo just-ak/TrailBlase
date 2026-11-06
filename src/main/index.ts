@@ -112,7 +112,18 @@ async function start(): Promise<void> {
   }
 
   // --- security, before any content loads
-  installContentSecurityPolicy(isDev);
+  //
+  // The surface is read per request rather than captured, so changing the
+  // routing endpoint or a custom tile URL in settings takes effect on the next
+  // navigation instead of requiring a restart.
+  installContentSecurityPolicy(isDev, () => {
+    const current = settingsService.all(ctx().handle.db);
+    return {
+      customTileUrl: current.customTileUrl,
+      customOverlayUrl: current.customOverlayUrl,
+      routingEndpoint: current.routingEndpoint,
+    };
+  });
   installTileUserAgent(app.getVersion());
   denyAllPermissions();
 

@@ -100,7 +100,7 @@ describeFit('readFit', () => {
     expect(file.warnings.join(' ')).toMatch(/0\.2 m/);
   });
 
-  it('keeps the file identity block for Phase 5', async () => {
+  it('keeps the file identity block for Phase 6 round-tripping', async () => {
     const file = await readFit(bytes, '/tmp/activity.fit');
     expect(file.tracks[0]?.metadata.fitFileId).toMatchObject({
       type: 'activity',

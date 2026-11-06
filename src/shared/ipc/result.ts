@@ -12,6 +12,17 @@ export const ERROR_CODES = [
   'DB_ERROR',
   'IO_ERROR',
   'BLOCKED',
+  // Phase 4. A routing provider is an external service, and its failures are
+  // not the application's faults — they need their own codes so the UI can
+  // offer "try again" rather than "something went wrong".
+  /** The service could not be reached, or did not answer in time. */
+  'PROVIDER_UNAVAILABLE',
+  /** The service answered, but with an error or something unparseable. */
+  'PROVIDER_ERROR',
+  /** The user cancelled. Not a failure, and must not be reported as one. */
+  'CANCELLED',
+  /** A network capability the user has not opted into. */
+  'CONSENT_REQUIRED',
   'UNKNOWN',
 ] as const;
 

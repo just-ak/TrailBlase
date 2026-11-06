@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import L from "leaflet";
-import { MAP_PROVIDERS } from "@shared/map/MapProvider";
+import { MAP_OVERLAYS, MAP_PROVIDERS } from "@shared/map/MapProvider";
 import type {
   Bounds,
   MapPosition,
@@ -24,10 +24,14 @@ import { useGeometryStore } from "../../stores/geometryStore";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUiStore } from "../../stores/uiStore";
+import { useRoutingStore } from "../../stores/routingStore";
 import { getMapInstance, useMapInstance } from "./mapInstance";
+import { MapReadout } from "./MapReadout";
 import { useDrawMode } from "./useDrawMode";
 import { useLeafletMap } from "./useLeafletMap";
+import { useMeasureTool, measureStateFrom } from "./useMeasureTool";
 import { useRouteLayers } from "./useRouteLayers";
+import { useSnapOverlay } from "./useSnapOverlay";
 import { useTrackLayers } from "./useTrackLayers";
 import { useWaypointLayers } from "./useWaypointLayers";
 
@@ -76,6 +80,11 @@ export function MapView(): ReactNode {
 
   const mode = useEditorStore((s) => s.mode);
   const pending = useEditorStore((s) => s.pending);
+  const measurePoints = useEditorStore((s) => s.measurePoints);
+  const snapWhileDrawing = useEditorStore((s) => s.snapWhileDrawing);
+
+  const routingStatus = useRoutingStore((s) => s.status);
+  const routeProvenance = useRoutingStore((s) => s.provenance);
 
   const [layerMenuOpen, setLayerMenuOpen] = useState(false);
   /** Per-point dots on the selected track. Off by default: see useTrackLayers. */
@@ -108,8 +117,11 @@ export function MapView(): ReactNode {
     }, 600);
   }, []);
 
-  const handle = useLeafletMap({
+  const { handle, readout, providerUsable } = useLeafletMap({
     providerId: settings.mapProviderId,
+    customTileUrl: settings.customTileUrl,
+    overlayId: settings.mapOverlayId,
+    customOverlayUrl: settings.customOverlayUrl,
     initial: initialPosition,
     onPositionChange,
     onTileError: setOffline,
@@ -117,10 +129,29 @@ export function MapView(): ReactNode {
 
   const map = useMapInstance();
 
+  /*
+   * Layer visibility, Requirement 4.3.
+   *
+   * Hiding a class of object passes an empty array to its hook rather than
+   * adding a `visible` flag to each one. The hooks already remove layers for
+   * objects that disappear from their input, so this reuses a path that is
+   * exercised on every edit instead of adding a second way to hide something.
+   */
+  const visibility = settings.layerVisibility;
+  const visibleRoutes = visibility.routes
+    ? (geometry?.routes ?? NO_ROUTES)
+    : NO_ROUTES;
+  const visibleTracks = visibility.tracks
+    ? (geometry?.tracks ?? NO_TRACKS)
+    : NO_TRACKS;
+  const visibleWaypoints = visibility.waypoints
+    ? (geometry?.waypoints ?? NO_WAYPOINTS)
+    : NO_WAYPOINTS;
+
   // --- object layers
   useRouteLayers(
     map,
-    geometry?.routes ?? NO_ROUTES,
+    visibleRoutes,
     selected?.kind === "route" ? selected.id : null,
     {
       onSelect: (id) => void select({ kind: "route", id }),
@@ -162,7 +193,7 @@ export function MapView(): ReactNode {
 
   useTrackLayers(
     map,
-    geometry?.tracks ?? NO_TRACKS,
+    visibleTracks,
     selected?.kind === "track" ? selected.id : null,
     {
       onSelect: (id) => void select({ kind: "track", id }),
@@ -199,7 +230,7 @@ export function MapView(): ReactNode {
 
   useWaypointLayers(
     map,
-    geometry?.waypoints ?? NO_WAYPOINTS,
+    visibleWaypoints,
     selected?.kind === "waypoint" ? selected.id : null,
     {
       onSelect: (id) => void select({ kind: "waypoint", id }),
@@ -240,10 +271,14 @@ export function MapView(): ReactNode {
         notes: null,
       }),
     onFinish: () => {
-      const tripId = useEditorStore.getState().targetTripId;
-      const points = useEditorStore.getState().finish();
+      const editor = useEditorStore.getState();
+      const tripId = editor.targetTripId;
+      const snap = editor.snapWhileDrawing;
+      const points = editor.finish();
       if (tripId !== null && points.length > 0) {
-        void actions.createRouteFromPoints(tripId, points);
+        // One call either way. It creates the route first and snaps second, so
+        // an unreachable provider costs the snap rather than the route.
+        void actions.createRouteFromDrawnPoints(tripId, points, snap);
       }
     },
     onCancel: () => {
@@ -252,6 +287,37 @@ export function MapView(): ReactNode {
     },
     onUndoLast: () => useEditorStore.getState().undoLastPending(),
   });
+
+  // --- measure tool: creates nothing, so it has no undo entry
+  useMeasureTool(map, {
+    active: mode === "measure",
+    points: measurePoints,
+    onAppend: (point) => useEditorStore.getState().appendMeasure(point),
+    onUndoLast: () => useEditorStore.getState().undoLastMeasure(),
+    onClear: () => useEditorStore.getState().clearMeasure(),
+    onExit: () => {
+      useEditorStore.getState().cancel();
+      showToast("Measuring finished. Nothing was saved.");
+    },
+  });
+
+  // --- dashed annotation over the straight sections of a snapped route
+  useSnapOverlay(
+    map,
+    selected?.kind === "route" ? (routeProvenance[selected.id] ?? null) : null,
+  );
+
+  /*
+   * Snap provenance for the selected route.
+   *
+   * A local database read, so it is safe to do on selection — unlike a match or
+   * a snap, it cannot cause a request. Without it the map could not mark the
+   * unmatched legs of a route the user is already looking at.
+   */
+  useEffect(() => {
+    if (selected?.kind !== "route") return;
+    void useRoutingStore.getState().loadProvenance(selected.id);
+  }, [selected]);
 
   /**
    * During a placement or drawing mode, object layers stop receiving pointer
@@ -410,6 +476,11 @@ export function MapView(): ReactNode {
     setLayerMenuOpen(false);
   };
 
+  const setOverlay = async (id: string): Promise<void> => {
+    await useSettingsStore.getState().set({ key: "mapOverlayId", value: id });
+    setLayerMenuOpen(false);
+  };
+
   if (!loaded) {
     return (
       <div className="flex flex-1 items-center justify-center bg-[var(--color-surface-sunken)] text-[var(--color-text-muted)]">
@@ -421,6 +492,7 @@ export function MapView(): ReactNode {
   // Derived from the subscribed value, so it re-renders with it rather than
   // reading store state during render.
   const pendingDistance = pending.length < 2 ? null : pathDistance(pending);
+  const measure = measureStateFrom(measurePoints);
 
   return (
     <div
@@ -463,11 +535,11 @@ export function MapView(): ReactNode {
         </div>
       )}
 
-      {/* Mode hint bar. Also the place that states no road-snapping happens. */}
+      {/* Mode hint bar. Also the place that states whether snapping is on. */}
       {mode !== "idle" && (
-        <div className="pointer-events-none absolute top-3 left-1/2 z-[600] -translate-x-1/2 rounded-md bg-[var(--color-text-primary)] px-3 py-2 text-[12px] text-[var(--color-surface)] shadow-lg">
-          {mode === "drawRoute" ? (
-            <span>
+        <div className="absolute top-3 left-1/2 z-[600] -translate-x-1/2 rounded-md bg-[var(--color-text-primary)] px-3 py-2 text-[12px] text-[var(--color-surface)] shadow-lg">
+          {mode === "drawRoute" && (
+            <span className="pointer-events-none">
               Click to add points · <strong>Enter</strong> or double-click to
               finish · <strong>Backspace</strong> removes the last ·{" "}
               <strong>Esc</strong> cancels
@@ -480,15 +552,85 @@ export function MapView(): ReactNode {
                   )}
                 </>
               )}
-              <span className="ml-2 opacity-70">
-                Straight lines — not snapped to paths
-              </span>
             </span>
-          ) : (
-            <span>
+          )}
+
+          {/*
+            The snap toggle sits in the hint bar because that is where the user
+            is looking while drawing. It is only offered when a provider is
+            actually available: a control that looks functional and does
+            nothing is exactly what the honesty rule forbids.
+          */}
+          {mode === "drawRoute" &&
+            (routingStatus?.available === true ? (
+              <button
+                type="button"
+                aria-pressed={snapWhileDrawing}
+                onClick={() =>
+                  useEditorStore
+                    .getState()
+                    .setSnapWhileDrawing(!snapWhileDrawing)
+                }
+                className={`ml-3 rounded border px-2 py-0.5 text-[11px] ${
+                  snapWhileDrawing
+                    ? "border-[var(--color-surface)] bg-[var(--color-surface)] font-semibold text-[var(--color-text-primary)]"
+                    : "border-[var(--color-surface)]/50 text-[var(--color-surface)]"
+                }`}
+                title={
+                  snapWhileDrawing
+                    ? "Points will be joined by road geometry when you finish"
+                    : "Points will be joined by straight lines"
+                }
+              >
+                {snapWhileDrawing
+                  ? "Snapping to roads"
+                  : "Straight lines — snap to roads"}
+              </button>
+            ) : (
+              <span className="pointer-events-none ml-2 opacity-70">
+                Straight lines — no routing service configured
+              </span>
+            ))}
+
+          {mode === "placeWaypoint" && (
+            <span className="pointer-events-none">
               Click the map to place a waypoint · <strong>Esc</strong> cancels
             </span>
           )}
+
+          {mode === "measure" && (
+            <span className="pointer-events-none">
+              Measuring · click to add points · <strong>Backspace</strong>{" "}
+              removes the last · <strong>Enter</strong> starts over ·{" "}
+              <strong>Esc</strong> finishes
+              <span className="ml-2 opacity-70">
+                Nothing is saved and nothing is created
+              </span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/*
+        The running total, kept separate from the hint bar so the numbers do not
+        move as the hint text reflows.
+      */}
+      {mode === "measure" && measurePoints.length > 0 && (
+        <div
+          role="status"
+          className="pointer-events-none absolute top-16 left-1/2 z-[600] -translate-x-1/2 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-3 py-1.5 text-[12px] text-[var(--color-text-primary)] shadow-md"
+        >
+          <strong>{formatDistance(measure.totalM, settings.units)}</strong>{" "}
+          total
+          {measure.lastSegmentM !== null && (
+            <span className="ml-2 text-[var(--color-text-secondary)]">
+              last segment{" "}
+              {formatDistance(measure.lastSegmentM, settings.units)}
+            </span>
+          )}
+          <span className="ml-2 text-[var(--color-text-muted)]">
+            {measurePoints.length} point{measurePoints.length === 1 ? "" : "s"}
+          </span>
         </div>
       )}
 
@@ -535,6 +677,38 @@ export function MapView(): ReactNode {
 
         <button
           type="button"
+          aria-label="Measure distance"
+          aria-pressed={mode === "measure"}
+          title="Measure distance on the map. Creates nothing."
+          onClick={() => {
+            if (mode === "measure") useEditorStore.getState().cancel();
+            else actions.startMeasuring();
+          }}
+          className={`flex h-8 w-8 items-center justify-center rounded-md border text-[13px] shadow-md ${
+            mode === "measure"
+              ? "border-[var(--color-accent)] bg-[var(--color-surface)] text-[var(--color-accent)]"
+              : "border-[var(--color-border-subtle)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)]"
+          }`}
+        >
+          {/* A ruler, drawn rather than a glyph so it reads at 13px. */}
+          <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              d="M2.5 12.5 12.5 2.5l5 5-10 10-5-5Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M6 9l2 2m2-5 2 2m-8 6 2 2"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.2"
+            />
+          </svg>
+        </button>
+
+        <button
+          type="button"
           aria-label="Fit trip to screen"
           title="Fit trip to screen"
           onClick={() => {
@@ -568,7 +742,7 @@ export function MapView(): ReactNode {
           </button>
 
           {layerMenuOpen && (
-            <div className="absolute top-0 right-9 w-56 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface)] py-1 shadow-xl">
+            <div className="absolute top-0 right-9 w-64 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface)] py-1 shadow-xl">
               <p className="px-3 py-1 text-[11px] font-semibold tracking-wide text-[var(--color-text-muted)] uppercase">
                 Base map
               </p>
@@ -584,12 +758,95 @@ export function MapView(): ReactNode {
                   }`}
                 >
                   {provider.name}
+                  {provider.userSupplied === true && (
+                    <span className="block text-[11px] text-[var(--color-text-muted)]">
+                      Needs a tile URL in Settings
+                    </span>
+                  )}
                 </button>
               ))}
+
               <div className="my-1 h-px bg-[var(--color-border-subtle)]" />
+              <p className="px-3 py-1 text-[11px] font-semibold tracking-wide text-[var(--color-text-muted)] uppercase">
+                Overlay
+              </p>
+              <button
+                type="button"
+                onClick={() => void setOverlay("")}
+                className={`block w-full px-3 py-1.5 text-left text-[13px] hover:bg-[var(--color-surface-sunken)] ${
+                  settings.mapOverlayId === ""
+                    ? "font-semibold text-[var(--color-accent)]"
+                    : "text-[var(--color-text-primary)]"
+                }`}
+              >
+                None
+              </button>
+              {MAP_OVERLAYS.map((overlay) => (
+                <button
+                  key={overlay.id}
+                  type="button"
+                  onClick={() => void setOverlay(overlay.id)}
+                  className={`block w-full px-3 py-1.5 text-left text-[13px] hover:bg-[var(--color-surface-sunken)] ${
+                    overlay.id === settings.mapOverlayId
+                      ? "font-semibold text-[var(--color-accent)]"
+                      : "text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  {overlay.name}
+                  {overlay.userSupplied === true && (
+                    <span className="block text-[11px] text-[var(--color-text-muted)]">
+                      Needs an overlay URL in Settings
+                    </span>
+                  )}
+                </button>
+              ))}
+
+              <div className="my-1 h-px bg-[var(--color-border-subtle)]" />
+              <p className="px-3 py-1 text-[11px] font-semibold tracking-wide text-[var(--color-text-muted)] uppercase">
+                Show
+              </p>
+              {(
+                [
+                  ["routes", "Routes"],
+                  ["tracks", "Tracks"],
+                  ["waypoints", "Waypoints"],
+                ] as const
+              ).map(([key, label]) => (
+                <label
+                  key={key}
+                  className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[13px] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-sunken)]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={visibility[key]}
+                    onChange={(event) =>
+                      void useSettingsStore.getState().set({
+                        key: "layerVisibility",
+                        value: { ...visibility, [key]: event.target.checked },
+                      })
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+
+              <div className="my-1 h-px bg-[var(--color-border-subtle)]" />
+              <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[13px] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-sunken)]">
+                <input
+                  type="checkbox"
+                  checked={settings.showScaleBar}
+                  onChange={(event) =>
+                    void useSettingsStore
+                      .getState()
+                      .set({ key: "showScaleBar", value: event.target.checked })
+                  }
+                />
+                Scale bar
+              </label>
+
               <p className="px-3 py-1 text-[11px] leading-snug text-[var(--color-text-muted)]">
-                Terrain and offline sources arrive in a later phase. Tiles are
-                never bulk-downloaded.
+                Tiles are fetched only for what you are looking at and are never
+                bulk-downloaded.
               </p>
             </div>
           )}
@@ -603,10 +860,30 @@ export function MapView(): ReactNode {
         </div>
       )}
 
-      {offline && (
+      <MapReadout
+        readout={readout}
+        units={settings.units}
+        showScaleBar={settings.showScaleBar}
+      />
+
+      {/*
+        A selected provider with no tile template shows no tiles, and says so
+        rather than silently falling back to OpenStreetMap. Requirement 1.4.
+      */}
+      {!providerUsable && (
         <div
           role="status"
-          className="absolute bottom-3 left-3 z-[500] rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-3 py-1.5 text-[12px] text-[var(--color-text-secondary)] shadow-md"
+          className="absolute top-3 left-3 z-[500] max-w-xs rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-3 py-1.5 text-[12px] text-[var(--color-text-secondary)] shadow-md"
+        >
+          The custom tile source has no URL yet, so no map tiles are being
+          drawn. Add one in Settings, or pick a different base map.
+        </div>
+      )}
+
+      {offline && providerUsable && (
+        <div
+          role="status"
+          className="absolute top-3 left-3 z-[500] max-w-xs rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-3 py-1.5 text-[12px] text-[var(--color-text-secondary)] shadow-md"
         >
           Map tiles unavailable — your trips are still fully editable offline.
         </div>

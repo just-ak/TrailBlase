@@ -12,6 +12,8 @@ import * as actions from "../../lib/actions";
 import { api, callOr } from "../../lib/client";
 import { Button } from "../../components/Button";
 import { Field, INPUT_CLASS, ReadOnly } from "./fields";
+import { RoadDataSection } from "./RoadDataSection";
+import { WazeButton } from "./WazeButton";
 
 /**
  * Track inspector.
@@ -375,10 +377,29 @@ export function TrackProperties({
         <ReadOnly value={formatTimestamp(track.updatedAt)} />
       </Field>
 
+      <RoadDataSection
+        ownerType="track"
+        ownerId={track.id}
+        units={units}
+        pointCount={track.pointCount}
+      />
+
       <div className="mt-4 flex flex-wrap gap-2">
         <Button onClick={() => void actions.reverseTrack(track.id)}>
           Reverse
         </Button>
+        <Button onClick={() => actions.openProfile("track", track.id)}>
+          Profile
+        </Button>
+        <WazeButton
+          selection={{
+            kind: "track",
+            name: track.name,
+            points: track.segments.flatMap((segment) =>
+              segment.points.map((p) => ({ lat: p.lat, lon: p.lon })),
+            ),
+          }}
+        />
         <Button
           onClick={() =>
             actions.openExportDialog({ kind: "track", id: track.id })
