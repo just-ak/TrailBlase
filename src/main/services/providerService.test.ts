@@ -85,9 +85,10 @@ describe('resolveFrom', () => {
     expect(resolution.status.attribution).toMatch(/OpenStreetMap/);
   });
 
-  // Claiming more verification than has happened would be the dishonesty the
-  // architecture rules forbid.
-  it('never claims verification against a live instance', () => {
+  // An untested endpoint must not present itself as a working one. Claiming
+  // more than has been established is the dishonesty the architecture rules
+  // forbid, and here it would have the user blame their route for a dead host.
+  it('does not claim an untested endpoint has been tested', () => {
     const resolution = providerService.resolveFrom(
       settings({
         routingEndpoint: 'https://routing.example.org',
@@ -95,7 +96,37 @@ describe('resolveFrom', () => {
       }),
     );
 
-    expect(resolution.status.verifiedAgainstLiveInstance).toBe(false);
+    expect(resolution.status.endpointTested).toBe(false);
+  });
+
+  it('reports a failed test without marking the endpoint as tested', async () => {
+    // Reserved for documentation and guaranteed not to resolve to a service.
+    const result = await providerService.testConnection(
+      'https://routing.invalid',
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.pointCount).toBeNull();
+    expect(
+      providerService.resolveFrom(
+        settings({
+          routingEndpoint: 'https://routing.invalid',
+          routingConsentAccepted: true,
+        }),
+      ).status.endpointTested,
+    ).toBe(false);
+  });
+
+  it('refuses to test an address the origin policy would reject', async () => {
+    const result = await providerService.testConnection(
+      'http://routing.example.org',
+    );
+
+    // Refused locally, so no request is made at all.
+    expect(result.ok).toBe(false);
+    expect(result.origin).toBeNull();
+    expect(result.elapsedMs).toBeNull();
+    expect(result.message).toMatch(/Plaintext http/);
   });
 });
 

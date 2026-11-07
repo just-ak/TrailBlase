@@ -138,3 +138,29 @@ Update `docs/progress-mindmap.svg` as each task changes status.
     published reference and synthetic fixtures, **not** against a live instance
   - Update the mindmap to show Phase 4 complete
   - _Requirements: all_
+
+## Added after the verification pass
+
+- [x] 17. Interactive snap routing tool
+  - A distinct editor mode: each click is a **control point**, and the leg from
+    the previous one is routed immediately so the road-following line appears
+    as the user builds it
+  - One provider call per click (`routing:routeLeg`), not a re-snap of the
+    whole line, so the tenth click costs what the first did
+  - Legs are routed strictly in order with a generation guard, because replies
+    can arrive late or out of order and `legs` must stay index-aligned with the
+    gaps between control points
+  - Saves the **previewed** geometry (`routing:createSnapped`), not a re-route:
+    the user accepted a specific line and must get it
+  - Bounded by `MAX_UNDOABLE_POINTS` rather than `MAX_SNAPPED_POINTS`, so a
+    route built with the tool stays editable through `route:setGeometry`
+  - Three visually distinct leg states: routed, unmatched (dashed red, matching
+    a whole-route snap), and pending
+  - Toolbar control is **disabled with the reason** when no provider is
+    available, never silently inert
+  - Unit tests: one call per leg, unmatched reported not thrown, previewed
+    geometry saved verbatim, leg/point mismatch refused with nothing written,
+    point cap refused with the count, undo removes the control points too
+  - E2E: the tool is present but disabled with no provider; `routeLeg` refuses
+    with `PROVIDER_UNAVAILABLE`; a leg/point mismatch is refused at the schema
+  - _Requirements: 3.1, 3.2, 3.3, 3.6, 3.8, 9_

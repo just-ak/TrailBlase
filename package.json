@@ -26,6 +26,7 @@
     "package": "npm run build && electron-builder --mac",
     "postinstall": "install-electron && electron-builder install-app-deps",
     "verify:native": "electron scripts/verify-native.mjs",
+    "verify:valhalla": "TRAILRT_LIVE_VALHALLA=${TRAILRT_LIVE_VALHALLA:-https://valhalla1.openstreetmap.de} vitest run src/main/routing/valhalla.live.test.ts",
     "licences": "node scripts/generate-licences.mjs",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
     "licences:check": "node scripts/generate-licences.mjs",

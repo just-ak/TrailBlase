@@ -177,57 +177,29 @@ describe('flattenLegs', () => {
   // stationary sample in any speed calculation.
   it('drops the vertex shared between consecutive legs', () => {
     const shared = { lat: 46.51, lon: 8.01 };
-    const flat = routingService.flattenLegs({
-      provider: 'fake',
-      mode: 'auto',
-      unmatchedLegs: [],
-      legs: [
-        {
-          matched: true,
-          fromControlIndex: 0,
-          toControlIndex: 1,
-          shape: [{ lat: 46.5, lon: 8 }, shared],
-          distanceM: null,
-          durationS: null,
-        },
-        {
-          matched: true,
-          fromControlIndex: 1,
-          toControlIndex: 2,
-          shape: [shared, { lat: 46.52, lon: 8.02 }],
-          distanceM: null,
-          durationS: null,
-        },
-      ],
-    });
+    const flat = routingService.flattenLegs([
+      { shape: [{ lat: 46.5, lon: 8 }, shared] },
+      { shape: [shared, { lat: 46.52, lon: 8.02 }] },
+    ]);
 
     expect(flat).toHaveLength(3);
   });
 
   it('keeps a genuinely distinct vertex at a leg boundary', () => {
-    const flat = routingService.flattenLegs({
-      provider: 'fake',
-      mode: 'auto',
-      unmatchedLegs: [],
-      legs: [
-        {
-          matched: true,
-          fromControlIndex: 0,
-          toControlIndex: 1,
-          shape: [{ lat: 46.5, lon: 8 }, { lat: 46.51, lon: 8.01 }],
-          distanceM: null,
-          durationS: null,
-        },
-        {
-          matched: false,
-          fromControlIndex: 1,
-          toControlIndex: 2,
-          shape: [{ lat: 46.6, lon: 8.1 }, { lat: 46.62, lon: 8.12 }],
-          distanceM: null,
-          durationS: null,
-        },
-      ],
-    });
+    const flat = routingService.flattenLegs([
+      {
+        shape: [
+          { lat: 46.5, lon: 8 },
+          { lat: 46.51, lon: 8.01 },
+        ],
+      },
+      {
+        shape: [
+          { lat: 46.6, lon: 8.1 },
+          { lat: 46.62, lon: 8.12 },
+        ],
+      },
+    ]);
     expect(flat).toHaveLength(4);
   });
 });
@@ -816,5 +788,290 @@ describe('postedDistribution', () => {
     );
     expect(result?.distribution.allUnknown).toBe(true);
     expect(result?.distribution.unknown.percent).toBeCloseTo(100, 6);
+  });
+});
+
+// ------------------------------------------- the interactive snap routing tool
+
+/** A previewed leg, as the renderer would hand one back on finish. */
+const previewed = (
+  shape: { lat: number; lon: number }[],
+  matched = true,
+  distanceM: number | null = 100,
+) => ({ matched, shape, distanceM });
+
+describe('routeLeg', () => {
+  it('returns one leg from a two-point snap', async () => {
+    const leg = await routingService.routeLeg(
+      fakeProvider({}),
+      { lat: 46.5, lon: 8 },
+      { lat: 46.52, lon: 8.02 },
+      'auto',
+    );
+
+    expect(leg.matched).toBe(true);
+    // The fake inserts a midpoint, so a routed leg is more than the two ends.
+    expect(leg.shape).toHaveLength(3);
+  });
+
+  it('issues exactly one provider call per leg', async () => {
+    let calls = 0;
+    const provider = fakeProvider({
+      onCall: () => {
+        calls += 1;
+      },
+    });
+
+    await routingService.routeLeg(
+      provider,
+      { lat: 46.5, lon: 8 },
+      { lat: 46.51, lon: 8.01 },
+      'auto',
+    );
+
+    // The whole point of the interactive tool: a click costs one call, so the
+    // tenth click is no more expensive than the first.
+    expect(calls).toBe(1);
+  });
+
+  // Requirement 3.6: a leg with no road path is a straight line and a report,
+  // not an error that loses the user's click.
+  it('reports an unmatched leg as a straight line rather than failing', async () => {
+    const leg = await routingService.routeLeg(
+      fakeProvider({ legShape: () => null }),
+      { lat: 46.5, lon: 8 },
+      { lat: 46.52, lon: 8.02 },
+      'auto',
+    );
+
+    expect(leg.matched).toBe(false);
+    expect(leg.shape).toEqual([
+      { lat: 46.5, lon: 8 },
+      { lat: 46.52, lon: 8.02 },
+    ]);
+    expect(leg.distanceM).toBeNull();
+  });
+
+  it('treats a provider that returns nothing usable as unmatched', async () => {
+    const leg = await routingService.routeLeg(
+      fakeProvider({ legShape: () => [] }),
+      { lat: 46.5, lon: 8 },
+      { lat: 46.52, lon: 8.02 },
+      'auto',
+    );
+
+    expect(leg.matched).toBe(false);
+    expect(leg.shape).toHaveLength(2);
+  });
+});
+
+describe('createSnappedRoute', () => {
+  const control = [
+    { lat: 46.5, lon: 8 },
+    { lat: 46.52, lon: 8.02 },
+    { lat: 46.54, lon: 8.04 },
+  ];
+
+  it('saves the previewed geometry, not a re-route', () => {
+    /*
+     * A shape that deliberately detours well off the straight line. If the
+     * service re-routed on save, the stored geometry would come back as
+     * something else and this detour would vanish.
+     */
+    const detour = { lat: 46.7, lon: 8.3 };
+
+    const mutation = routingService.createSnappedRoute(db, {
+      tripId,
+      name: 'Built by clicking',
+      colour: null,
+      controlPoints: control,
+      legs: [
+        previewed([control[0] as never, detour, control[1] as never]),
+        previewed([control[1] as never, control[2] as never]),
+      ],
+      mode: 'auto',
+      provider: 'fake',
+    });
+
+    const saved = routeService.get(db, mutation.result.id);
+    // Four points: three leg vertices plus two, minus the shared one.
+    expect(saved.points).toHaveLength(4);
+    expect(saved.points[1]).toMatchObject(detour);
+  });
+
+  it('keeps the clicked points as control points', () => {
+    const mutation = routingService.createSnappedRoute(db, {
+      tripId,
+      name: 'Route',
+      colour: null,
+      controlPoints: control,
+      legs: [
+        previewed([control[0] as never, control[1] as never]),
+        previewed([control[1] as never, control[2] as never]),
+      ],
+      mode: 'motorcycle',
+      provider: 'fake',
+    });
+
+    const stored = controlRepo.listControlPoints(db, mutation.result.id);
+    expect(stored).toHaveLength(3);
+    expect(stored[0]).toMatchObject({ lat: 46.5, lon: 8 });
+
+    const provenance = routingService.provenance(db, mutation.result.id);
+    expect(provenance.routingProvider).toBe('fake');
+    expect(provenance.transportMode).toBe('motorcycle');
+    expect(provenance.controlPointCount).toBe(3);
+  });
+
+  it('records which legs stayed straight', () => {
+    const mutation = routingService.createSnappedRoute(db, {
+      tripId,
+      name: 'Route',
+      colour: null,
+      controlPoints: control,
+      legs: [
+        previewed([control[0] as never, control[1] as never]),
+        previewed([control[1] as never, control[2] as never], false, null),
+      ],
+      mode: 'auto',
+      provider: 'fake',
+    });
+
+    expect(
+      routingService.provenance(db, mutation.result.id).unmatchedLegs,
+    ).toEqual([[1, 2]]);
+  });
+
+  /*
+   * A leg count that does not match the control points means the renderer's
+   * preview and its points had drifted apart, so neither can be trusted. The
+   * alternative — writing the legs anyway — stores a route whose control points
+   * do not describe it, and a later re-snap silently produces a different line.
+   */
+  it('refuses a leg count that does not match the control points', () => {
+    expect(() =>
+      routingService.createSnappedRoute(db, {
+        tripId,
+        name: 'Route',
+        colour: null,
+        controlPoints: control,
+        legs: [previewed([control[0] as never, control[1] as never])],
+        mode: 'auto',
+        provider: 'fake',
+      }),
+    ).toThrow(ServiceError);
+
+    // And nothing was written.
+    expect(routeService.listForTrip(db, tripId)).toHaveLength(0);
+  });
+
+  it('refuses fewer than two points', () => {
+    expect(() =>
+      routingService.createSnappedRoute(db, {
+        tripId,
+        name: 'Route',
+        colour: null,
+        controlPoints: [control[0] as never],
+        legs: [],
+        mode: 'auto',
+        provider: 'fake',
+      }),
+    ).toThrow(ServiceError);
+  });
+
+  /*
+   * Bounded by the undo limit rather than the higher snapped-route limit, so a
+   * route built with the tool stays editable through `route:setGeometry`
+   * afterwards. Producing a route this app can store but not edit would be
+   * worse than refusing the last leg.
+   */
+  it('refuses a route past the editable point limit, naming the count', () => {
+    const huge = Array.from({ length: MAX_UNDOABLE_POINTS + 10 }, (_, i) => ({
+      lat: 46.5 + i * 0.00001,
+      lon: 8,
+    }));
+
+    let message = '';
+    try {
+      routingService.createSnappedRoute(db, {
+        tripId,
+        name: 'Route',
+        colour: null,
+        controlPoints: [control[0] as never, control[1] as never],
+        legs: [previewed(huge)],
+        mode: 'auto',
+        provider: 'fake',
+      });
+    } catch (error) {
+      message = (error as ServiceError).message;
+    }
+
+    expect(message).toContain(MAX_UNDOABLE_POINTS.toLocaleString());
+    expect(routeService.listForTrip(db, tripId)).toHaveLength(0);
+  });
+
+  it('is undoable, and the undo takes the control points with it', async () => {
+    const mutation = routingService.createSnappedRoute(db, {
+      tripId,
+      name: 'Route',
+      colour: null,
+      controlPoints: control,
+      legs: [
+        previewed([control[0] as never, control[1] as never]),
+        previewed([control[1] as never, control[2] as never]),
+      ],
+      mode: 'auto',
+      provider: 'fake',
+    });
+    const id = mutation.result.id;
+    undoService.record(mutation.inverse);
+
+    expect(controlRepo.hasControlPoints(db, id)).toBe(true);
+
+    undoService.undo(db);
+
+    // The route is gone, and `route_control_points` cascades on delete, so no
+    // orphaned control points are left behind.
+    expect(routeService.listForTrip(db, tripId)).toHaveLength(0);
+    expect(controlRepo.listControlPoints(db, id)).toHaveLength(0);
+  });
+
+  it('joins legs by the same rule as a whole-route snap', () => {
+    const shared = { lat: 46.52, lon: 8.02 };
+
+    const mutation = routingService.createSnappedRoute(db, {
+      tripId,
+      name: 'Route',
+      colour: null,
+      controlPoints: [control[0] as never, shared, control[2] as never],
+      legs: [
+        previewed([control[0] as never, shared]),
+        previewed([shared, control[2] as never]),
+      ],
+      mode: 'auto',
+      provider: 'fake',
+    });
+
+    // Three, not four: the shared vertex at the control point is dropped once,
+    // exactly as `flattenLegs` does for `snapRoute`.
+    expect(routeService.get(db, mutation.result.id).points).toHaveLength(3);
+  });
+
+  it('stores no elevation rather than copying it from a control point', () => {
+    const mutation = routingService.createSnappedRoute(db, {
+      tripId,
+      name: 'Route',
+      colour: null,
+      controlPoints: [control[0] as never, control[1] as never],
+      legs: [previewed([control[0] as never, control[1] as never])],
+      mode: 'auto',
+      provider: 'fake',
+    });
+
+    const saved = routeService.get(db, mutation.result.id);
+    // Road vertices are different positions from the clicked points, so an
+    // elevation measured elsewhere would be invented data.
+    expect(saved.points.every((p) => p.ele === null)).toBe(true);
+    expect(saved.elevGainM).toBeNull();
   });
 });

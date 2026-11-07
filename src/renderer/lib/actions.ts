@@ -13,6 +13,7 @@ import { useGeometryStore } from '../stores/geometryStore';
 import { useLibraryStore } from '../stores/libraryStore';
 import { useRoutingStore } from '../stores/routingStore';
 import { useSelectionStore } from '../stores/selectionStore';
+import { useSnapRoutingStore } from '../stores/snapRoutingStore';
 import { useUiStore } from '../stores/uiStore';
 
 /**
@@ -624,4 +625,191 @@ export function openProfile(
   ownerId: string,
 ): void {
   useUiStore.getState().openProfile(ownerType, ownerId);
+}
+
+// ------------------------------------------- the interactive snap routing tool
+
+/**
+ * Starts the snap routing tool.
+ *
+ * Refuses up front when no provider is available, rather than letting the user
+ * place points into a tool that cannot route them. The status is re-read first
+ * because it is a local database call, so the check costs nothing and cannot be
+ * wrong about a consent the user just gave.
+ */
+export async function startSnapRouting(): Promise<void> {
+  const tripId = currentTripId();
+  if (tripId === null) {
+    toast('Select a trip first — a route has to belong to one.', 'error');
+    return;
+  }
+
+  const status = await useRoutingStore.getState().loadStatus();
+  if (status === null || !status.available) {
+    toast(
+      status?.message ??
+        'Snap routing needs a routing service. Add one in Settings.',
+      'error',
+    );
+    if (status?.reason === 'consent-required') {
+      useUiStore.getState().openDialog({ kind: 'settings' });
+    }
+    return;
+  }
+
+  useSnapRoutingStore.getState().reset();
+  useEditorStore.getState().startSnapRoute(tripId);
+  toast('Snap routing. Each click extends the route along the roads.');
+}
+
+export function cancelSnapRouting(): void {
+  useSnapRoutingStore.getState().reset();
+  useEditorStore.getState().cancel();
+}
+
+/**
+ * Routes every gap that still needs a leg, strictly in order.
+ *
+ * One request at a time, guarded by `draining`. Firing a request per click in
+ * parallel would be faster and wrong: replies can arrive out of order, and
+ * `legs` has to stay index-aligned with the gaps between control points or the
+ * saved route joins the wrong pairs. The ordering is enforced here rather than
+ * by sorting replies, because a sort cannot tell a late reply from a reply to a
+ * line that has since changed.
+ *
+ * Module-level rather than in the store: it is machinery for keeping the store
+ * consistent, not state the UI reads.
+ */
+let draining = false;
+
+async function drainSnapLegs(): Promise<void> {
+  if (draining) return;
+  draining = true;
+
+  try {
+    for (;;) {
+      const store = useSnapRoutingStore.getState();
+      const gap = store.nextGap();
+      if (gap === null) {
+        store.setRouting(false);
+        return;
+      }
+
+      const generation = store.generation;
+      store.setRouting(true);
+
+      let leg;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        leg = await call(
+          api().routing.routeLeg({ from: gap.from, to: gap.to }),
+        );
+      } catch (cause) {
+        const current = useSnapRoutingStore.getState();
+        if (current.generation !== generation) return;
+        current.setRouting(false);
+        /*
+         * The point stays on the map and the leg is left unrouted.
+         *
+         * Dropping the click would lose work the user did; silently inserting a
+         * straight line would claim the provider answered when it did not.
+         * Leaving the gap visible, with the reason, lets them retry or back out.
+         */
+        current.setError(describeError(cause));
+        routingFailure(cause);
+        return;
+      }
+
+      if (!useSnapRoutingStore.getState().acceptLeg(generation, gap.index, leg)) {
+        // The line changed while we were waiting. Another drain will pick up
+        // from wherever it now is.
+        return;
+      }
+    }
+  } finally {
+    draining = false;
+    // A generation bump during the await above can leave `routing` stuck on,
+    // because the loop returned before clearing it.
+    if (useSnapRoutingStore.getState().nextGap() === null) {
+      useSnapRoutingStore.getState().setRouting(false);
+    } else {
+      void drainSnapLegs();
+    }
+  }
+}
+
+export function appendSnapPoint(point: { lat: number; lon: number }): void {
+  useSnapRoutingStore.getState().appendPoint(point);
+  void drainSnapLegs();
+}
+
+export function undoLastSnapPoint(): void {
+  useSnapRoutingStore.getState().undoLastPoint();
+  void drainSnapLegs();
+}
+
+/**
+ * Saves the route exactly as previewed.
+ *
+ * Refuses while a leg is still in flight: saving then would store a route
+ * shorter than the one on screen, and the user would have no way to tell. A
+ * leg that failed outright is the same situation and gets the same refusal.
+ */
+export async function finishSnapRouting(): Promise<void> {
+  const editor = useEditorStore.getState();
+  const tripId = editor.targetTripId;
+  const snap = useSnapRoutingStore.getState();
+
+  if (tripId === null) {
+    cancelSnapRouting();
+    return;
+  }
+
+  if (snap.controlPoints.length < 2) {
+    toast('Place at least two points to build a route.', 'error');
+    return;
+  }
+
+  if (snap.legs.length !== snap.controlPoints.length - 1) {
+    toast(
+      snap.error === null
+        ? 'Still routing the last leg — give it a moment.'
+        : `The last leg could not be routed: ${snap.error}`,
+      'error',
+    );
+    return;
+  }
+
+  const controlPoints = snap.controlPoints;
+  const legs = snap.legs;
+  const unmatched = legs.filter((leg) => !leg.matched).length;
+
+  // Cleared before the write so a second Enter cannot submit the same route
+  // twice while the first call is in flight.
+  cancelSnapRouting();
+
+  try {
+    const route = await call(
+      api().routing.createSnapped({
+        tripId,
+        name: 'New Route',
+        controlPoints: [...controlPoints],
+        legs: [...legs],
+      }),
+    );
+    await refreshAll();
+    await useSelectionStore.getState().select({ kind: 'route', id: route.id });
+
+    if (unmatched > 0) {
+      toast(
+        `Route saved, following roads for ${legs.length - unmatched} of ${legs.length} legs. The other ${unmatched === 1 ? 'one is' : `${unmatched} are`} straight lines, drawn dashed in red.`,
+      );
+    } else {
+      toast(
+        `Route saved, following roads across ${legs.length} leg${legs.length === 1 ? '' : 's'}. Undo with ⌘Z.`,
+      );
+    }
+  } catch (cause) {
+    toast(describeError(cause), 'error');
+  }
 }

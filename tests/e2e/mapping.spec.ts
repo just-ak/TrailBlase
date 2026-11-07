@@ -307,13 +307,27 @@ test.describe('routing with no provider configured', () => {
     });
   });
 
-  test('never claims the adapter was verified against a live instance', async () => {
+  test('does not claim an untested endpoint has been tested', async () => {
     const status = await harness.page.evaluate(async () => {
       const result = await window.trailrt.routing.status();
       return result.ok ? result.data : null;
     });
 
-    expect(status?.verifiedAgainstLiveInstance).toBe(false);
+    expect(status?.endpointTested).toBe(false);
+  });
+
+  test('refuses to test an address the origin policy rejects', async () => {
+    const result = await harness.page.evaluate(async () => {
+      const response = await window.trailrt.routing.test({
+        endpoint: 'http://routing.example.org',
+      });
+      return response.ok ? response.data : null;
+    });
+
+    // Refused before any request is made, so this needs no network.
+    expect(result?.ok).toBe(false);
+    expect(result?.origin).toBeNull();
+    expect(result?.message).toMatch(/Plaintext http/);
   });
 
   test('the content security policy names no wildcard host', async () => {
@@ -484,5 +498,99 @@ test.describe('Waze hand-off', () => {
     });
 
     expect(refused).toMatch(/not in the allowed link list/i);
+  });
+});
+
+test.describe('the snap routing tool', () => {
+  /*
+   * The tool cannot be driven end to end without a live Valhalla instance, and
+   * standing one up in CI is out of scope. What is verified here is the part
+   * every user meets first: with no provider configured the tool refuses
+   * visibly rather than accepting clicks it cannot act on.
+   */
+  test('is offered but disabled, with the reason on the control', async () => {
+    const { page } = harness;
+
+    const tool = page.getByRole('button', { name: 'Snap routing' });
+    // Present, not hidden: a tool that vanishes is harder to understand than
+    // one that says why it cannot run.
+    await expect(tool).toBeVisible();
+    await expect(tool).toBeDisabled();
+    await expect(tool).toHaveAttribute('title', /straight lines/i);
+  });
+
+  test('refuses a leg request with the same code as a snap', async () => {
+    const code = await harness.page.evaluate(async () => {
+      const result = await window.trailrt.routing.routeLeg({
+        from: { lat: 46.5, lon: 8 },
+        to: { lat: 46.52, lon: 8.02 },
+      });
+      return result.ok ? null : result.error.code;
+    });
+
+    expect(code).toBe('PROVIDER_UNAVAILABLE');
+  });
+
+  test('rejects a leg count that does not match the points', async () => {
+    const { page } = harness;
+
+    const tripId = await page.evaluate(async () => {
+      const result = await window.trailrt.trips.list({});
+      return result.ok ? (result.data[0]?.id ?? null) : null;
+    });
+    expect(tripId).not.toBeNull();
+    if (tripId === null) return;
+
+    const outcome = await page.evaluate(async (id: string) => {
+      const result = await window.trailrt.routing.createSnapped({
+        tripId: id,
+        name: 'Mismatched',
+        // Three points need two legs. One leg is a preview that drifted out of
+        // step with its points, so neither can be trusted.
+        controlPoints: [
+          { lat: 46.5, lon: 8 },
+          { lat: 46.52, lon: 8.02 },
+          { lat: 46.54, lon: 8.04 },
+        ],
+        legs: [
+          {
+            matched: true,
+            shape: [
+              { lat: 46.5, lon: 8 },
+              { lat: 46.52, lon: 8.02 },
+            ],
+            distanceM: 100,
+          },
+        ],
+      });
+      return result.ok ? { ok: true } : { ok: false, code: result.error.code };
+    }, tripId);
+
+    // Caught at the schema, so it is reported as the request problem it is.
+    expect(outcome).toEqual({ ok: false, code: 'INVALID_REQUEST' });
+  });
+
+  test('exposes the tool through the named bridge and nothing wider', async () => {
+    const names = await harness.page.evaluate(() =>
+      Object.keys(window.trailrt.routing).toSorted(),
+    );
+
+    expect(names).toEqual([
+      'attributes',
+      'clearAttributes',
+      'consentNotice',
+      'createSnapped',
+      'match',
+      'profile',
+      'provenance',
+      'routeLeg',
+      'snap',
+      'speedDistribution',
+      'status',
+      // The connection test. Listed here deliberately: it is the one routing
+      // call not gated on consent, so its presence should be a decision
+      // someone made rather than something that drifted in.
+      'test',
+    ]);
   });
 });

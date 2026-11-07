@@ -399,21 +399,85 @@ describe('transport failures', () => {
     }
   });
 
+  /*
+   * The code matters as much as the message, because `snap` decides whether to
+   * fall back to a straight line based on it.
+   *
+   * `PROVIDER_ERROR` means the service answered and declined this particular
+   * request, which is a fact about the road. Everything else is a fact about
+   * the address or the service, which the next leg will hit identically, so it
+   * must not be disguised as an unroutable stretch.
+   */
   it.each([
-    [401, /API key/],
-    [404, /no endpoint at that address/],
-    [429, /rate-limiting/],
-    [500, /internal error/],
-  ])('explains status %s in terms a user can act on', async (status, hint) => {
-    handler = () => ({ status, json: { error: 'x' } });
+    [400, 'PROVIDER_ERROR', /rejected the request/],
+    [401, 'PROVIDER_ERROR', /API key/],
+    [500, 'PROVIDER_ERROR', /internal error/],
+    // Wrong address, not a missing road.
+    [404, 'PROVIDER_UNAVAILABLE', /no endpoint at that address/],
+    // The mistake the public demo host invites.
+    [405, 'PROVIDER_UNAVAILABLE', /demo website rather than its API/],
+    // Transient and affects every following call.
+    [429, 'PROVIDER_UNAVAILABLE', /rate-limiting/],
+  ])(
+    'classifies status %s as %s with an actionable message',
+    async (status, code, hint) => {
+      handler = () => ({ status, json: { error: 'x' } });
 
-    try {
-      await provider().match(ALPS, 'auto');
-      expect.unreachable('should have thrown');
-    } catch (cause) {
-      expect((cause as ServiceError).code).toBe('PROVIDER_ERROR');
-      expect((cause as ServiceError).message).toMatch(hint);
-    }
+      try {
+        await provider().match(ALPS, 'auto');
+        expect.unreachable('should have thrown');
+      } catch (cause) {
+        expect((cause as ServiceError).code).toBe(code);
+        expect((cause as ServiceError).message).toMatch(hint);
+      }
+    },
+  );
+
+  describe('what becomes a straight line and what does not', () => {
+    const TWO_POINTS = [
+      { lat: 46.5, lon: 8 },
+      { lat: 46.52, lon: 8.02 },
+    ];
+
+    // A service that answers "I cannot route this" is describing the road.
+    // Requirement 3.6: keep the straight line and report it.
+    it('falls back to a straight line when the service declines the leg', async () => {
+      handler = () => ({ status: 400, json: { error: 'No path could be found' } });
+
+      const result = await provider().snap(TWO_POINTS, 'auto');
+
+      expect(result.legs).toHaveLength(1);
+      expect(result.legs[0]?.matched).toBe(false);
+      expect(result.unmatchedLegs).toEqual([[0, 1]]);
+    });
+
+    /*
+     * The bug this test exists for: a dead host used to come back as a route
+     * full of "unmatched" legs. Twenty straight lines across the map and no
+     * indication the server was down, so the user goes looking for a gap in
+     * the map data that does not exist.
+     */
+    it('aborts rather than drawing straight lines when the host is wrong', async () => {
+      handler = () => ({ status: 404, json: { error: 'nope' } });
+
+      try {
+        await provider().snap(TWO_POINTS, 'auto');
+        expect.unreachable('should have thrown');
+      } catch (cause) {
+        expect((cause as ServiceError).code).toBe('PROVIDER_UNAVAILABLE');
+      }
+    });
+
+    it('aborts rather than drawing straight lines when rate-limited', async () => {
+      handler = () => ({ status: 429, json: { error: 'slow down' } });
+
+      try {
+        await provider().snap(TWO_POINTS, 'auto');
+        expect.unreachable('should have thrown');
+      } catch (cause) {
+        expect((cause as ServiceError).code).toBe('PROVIDER_UNAVAILABLE');
+      }
+    });
   });
 
   it('reports malformed JSON as a provider error, naming the likely cause', async () => {

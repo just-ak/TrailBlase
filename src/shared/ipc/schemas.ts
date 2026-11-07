@@ -676,6 +676,20 @@ export const routingConsentNoticeRequest = z
   .object({ endpoint: z.string().max(2048) })
   .strict();
 
+/**
+ * Testing an endpoint.
+ *
+ * The endpoint is supplied rather than read from settings so an address can be
+ * checked before it is saved — which is the point, since you want to know a
+ * host works before agreeing to send it your routes.
+ */
+export const routingTestRequest = z
+  .object({
+    endpoint: z.string().min(1).max(2048),
+    mode: transportModeRequestSchema,
+  })
+  .strict();
+
 export type RoutingSnapRequest = z.infer<typeof routingSnapRequest>;
 export type RoutingMatchRequest = z.infer<typeof routingMatchRequest>;
 export type RoutingProfileRequest = z.infer<typeof routingProfileRequest>;
@@ -698,3 +712,63 @@ export const savePngRequest = z
     base64: z.string().min(1).max(8_000_000),
   })
   .strict();
+
+// --------------------------------------- Phase 4: interactive snap routing
+
+const latLonSchema = z
+  .object({ lat: latSchema, lon: lonSchema })
+  .strict();
+
+/** One leg for the interactive tool: two points and a transport mode. */
+export const routingRouteLegRequest = z
+  .object({
+    from: latLonSchema,
+    to: latLonSchema,
+    mode: transportModeRequestSchema,
+  })
+  .strict();
+
+/**
+ * A leg as previewed by the tool, on its way back to be saved.
+ *
+ * `shape` is capped at the whole-route editable limit rather than something
+ * smaller: a single leg across a country legitimately carries thousands of
+ * vertices, and the meaningful bound is on the finished route, which
+ * `createSnappedRoute` enforces over the flattened total.
+ */
+const previewedLegSchema = z
+  .object({
+    matched: z.boolean(),
+    shape: z.array(latLonSchema).min(2).max(10_000),
+    distanceM: z.number().finite().nonnegative().nullable(),
+  })
+  .strict();
+
+/**
+ * Saving a route built click by click.
+ *
+ * The leg count is checked against the control-point count here as well as in
+ * the service. Catching it at the schema means the mismatch is reported as the
+ * request problem it is, with the field path, rather than reaching a service
+ * that has to decide what a half-described route means.
+ */
+export const routingCreateSnappedRequest = z
+  .object({
+    tripId: idSchema,
+    name: nameSchema,
+    colour: routeColourSchema.default(null),
+    controlPoints: z.array(latLonSchema).min(2).max(1000),
+    legs: z.array(previewedLegSchema).min(1).max(999),
+    mode: transportModeRequestSchema,
+  })
+  .strict()
+  .refine((value) => value.legs.length === value.controlPoints.length - 1, {
+    message:
+      'There must be exactly one leg between each pair of points.',
+    path: ['legs'],
+  });
+
+export type RoutingRouteLegRequest = z.infer<typeof routingRouteLegRequest>;
+export type RoutingCreateSnappedRequest = z.infer<
+  typeof routingCreateSnappedRequest
+>;

@@ -26,7 +26,9 @@ import type { SpeedDistribution } from '../geo/speedBands';
 import type { MatchedEdge } from '../routing/RoutingProvider';
 import type {
   AttributeStatus,
+  ConnectionTest,
   ConsentNotice,
+  PreviewedLeg,
   Profile,
   RouteProvenance,
   RoutingStatus,
@@ -252,7 +254,21 @@ export interface TrailRtApi {
     consentNotice(
       req: Req<typeof S.routingConsentNoticeRequest>,
     ): Promise<Result<ConsentNotice | null>>;
+    /**
+     * Routes two fixed sample points to prove an endpoint works. Sends none of
+     * the user's geometry, so it is usable before consent is given.
+     */
+    test(
+      req: Req<typeof S.routingTestRequest>,
+    ): Promise<Result<ConnectionTest>>;
     snap(req: Req<typeof S.routingSnapRequest>): Promise<Result<SnapOutcome>>;
+    /** One leg, no write. The interactive tool's per-click call. */
+    routeLeg(
+      req: Req<typeof S.routingRouteLegRequest>,
+    ): Promise<Result<PreviewedLeg>>;
+    createSnapped(
+      req: Req<typeof S.routingCreateSnappedRequest>,
+    ): Promise<Result<Route>>;
     provenance(
       req: Req<typeof S.routingProvenanceRequest>,
     ): Promise<Result<RouteProvenance>>;

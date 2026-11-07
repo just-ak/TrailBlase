@@ -153,7 +153,10 @@ const api: TrailRtApi = {
   routing: {
     status: () => call(CHANNELS.routing.status),
     consentNotice: (req) => call(CHANNELS.routing.consentNotice, req),
+    test: (req) => call(CHANNELS.routing.test, req),
     snap: (req) => call(CHANNELS.routing.snap, req),
+    routeLeg: (req) => call(CHANNELS.routing.routeLeg, req),
+    createSnapped: (req) => call(CHANNELS.routing.createSnapped, req),
     provenance: (req) => call(CHANNELS.routing.provenance, req),
     match: (req) => call(CHANNELS.routing.match, req),
     attributes: (req) => call(CHANNELS.routing.attributes, req),

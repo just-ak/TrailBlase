@@ -107,7 +107,21 @@ export const CHANNELS = {
   routing: {
     status: 'routing:status',
     consentNotice: 'routing:consentNotice',
+    /**
+     * Tests an endpoint by routing two fixed sample points.
+     *
+     * The one routing call that is not gated on consent, because it transmits
+     * no geometry of the user's — see `providerService.testConnection`.
+     */
+    test: 'routing:test',
     snap: 'routing:snap',
+    /**
+     * Routes one leg and writes nothing. Backs the interactive snap routing
+     * tool, where each click costs exactly one provider call.
+     */
+    routeLeg: 'routing:routeLeg',
+    /** Saves a route built with the tool, as previewed. */
+    createSnapped: 'routing:createSnapped',
     provenance: 'routing:provenance',
     match: 'routing:match',
     attributes: 'routing:attributes',

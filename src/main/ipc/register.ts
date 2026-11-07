@@ -533,6 +533,19 @@ export function registerIpcHandlers(): void {
     (req) => providerService.consentNotice(req.endpoint),
   );
 
+  /*
+   * The only routing handler that does not call `requireProvider`.
+   *
+   * Deliberate, and narrow: it sends two hard-coded coordinates and nothing of
+   * the user's, so there is no consent to obtain, and it exists precisely so an
+   * endpoint can be verified *before* the user agrees to send it real routes.
+   * See `providerService.testConnection`.
+   */
+  handle(CHANNELS.routing.test, S.routingTestRequest, async (req) => {
+    const mode = req.mode ?? settingsService.all(ctx().handle.db).transportMode;
+    return providerService.testConnection(req.endpoint, mode);
+  });
+
   handle(CHANNELS.routing.snap, S.routingSnapRequest, async (req) => {
     const db = ctx().handle.db;
     const { provider, mode } = providerService.requireProvider(db);
@@ -558,6 +571,46 @@ export function registerIpcHandlers(): void {
 
     return commit(mutation);
   });
+
+  handle(CHANNELS.routing.routeLeg, S.routingRouteLegRequest, async (req) => {
+    const { provider, mode } = providerService.requireProvider(
+      ctx().handle.db,
+    );
+    return routingService.routeLeg(
+      provider,
+      req.from,
+      req.to,
+      req.mode ?? mode,
+    );
+  });
+
+  handle(
+    CHANNELS.routing.createSnapped,
+    S.routingCreateSnappedRequest,
+    (req) => {
+      const db = ctx().handle.db;
+
+      /*
+       * Resolved rather than taken from the request, so the provenance names
+       * the provider that is actually configured. A renderer-supplied provider
+       * id would be an unverifiable claim written into the database.
+       */
+      const { mode } = providerService.requireProvider(db);
+      const status = providerService.status(db);
+
+      return commit(
+        routingService.createSnappedRoute(db, {
+          tripId: req.tripId,
+          name: req.name,
+          colour: req.colour,
+          controlPoints: req.controlPoints,
+          legs: req.legs,
+          mode: req.mode ?? mode,
+          provider: status.providerId ?? 'unknown',
+        }),
+      );
+    },
+  );
 
   handle(CHANNELS.routing.provenance, S.routingProvenanceRequest, (req) =>
     routingService.provenance(ctx().handle.db, req.routeId),

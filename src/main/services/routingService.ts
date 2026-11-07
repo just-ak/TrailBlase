@@ -4,13 +4,14 @@ import {
   MAX_SNAPPED_POINTS,
   MAX_UNDOABLE_POINTS,
   type RoutingProvider,
-  type SnapResult,
   type TransportMode,
 } from '@shared/routing/RoutingProvider';
 import type {
+  PreviewedLeg,
   RouteProvenance,
   SnapOutcome,
 } from '@shared/routing/results';
+import type { Route } from '@shared/domain/types';
 import type { Db } from '../db/client';
 import * as controlRepo from '../db/repositories/routeControlPoints';
 import * as repo from '../db/repositories/routes';
@@ -45,17 +46,23 @@ import * as routeService from './routeService';
 export type { RouteProvenance, SnapOutcome } from '@shared/routing/results';
 
 /**
- * Flattens snapped legs into one point array.
+ * Flattens routed legs into one point array.
  *
  * Successive legs share a vertex — leg *n* ends where leg *n+1* begins — so the
  * duplicate is dropped. Keeping it would put a zero-length segment at every
  * control point, which inflates the point count and shows up as a stationary
  * sample in any speed calculation.
+ *
+ * Takes the legs rather than a whole `SnapResult` so the interactive tool,
+ * which accumulates legs one at a time and never builds a `SnapResult`, joins
+ * them by exactly the same rule as a whole-route snap.
  */
-export function flattenLegs(result: SnapResult): LatLon[] {
+export function flattenLegs(
+  legs: readonly { shape: readonly LatLon[] }[],
+): LatLon[] {
   const points: LatLon[] = [];
 
-  for (const leg of result.legs) {
+  for (const leg of legs) {
     for (const [index, point] of leg.shape.entries()) {
       if (index === 0 && points.length > 0) {
         const last = points.at(-1);
@@ -143,7 +150,7 @@ export async function snapRoute(
   // Outside the transaction: a network call must not hold a write lock, and a
   // failure here must leave the route untouched.
   const snapped = await input.provider.snap(control, input.mode);
-  const shape = flattenLegs(snapped);
+  const shape = flattenLegs(snapped.legs);
 
   if (shape.length < 2) {
     throw new ServiceError(
@@ -305,5 +312,162 @@ export function provenance(db: Db, routeId: string): RouteProvenance {
     unmatchedLegs: Array.isArray(unmatched)
       ? (unmatched as [number, number][])
       : [],
+  };
+}
+
+// ------------------------------------------- the interactive snap routing tool
+
+/**
+ * Routes a single leg, touching no database.
+ *
+ * This is what makes the tool interactive: a click routes the one new leg
+ * instead of re-routing the whole line, so the cost of the tenth click is the
+ * same as the cost of the first. Re-snapping the whole route on every click
+ * would be quadratic in provider calls and would make a ten-point route
+ * fifty-five requests instead of ten.
+ *
+ * Expressed through the existing `RoutingProvider.snap` rather than a new
+ * `routeLeg` method on the interface. A two-point snap is already exactly one
+ * `/route` call in the Valhalla adapter, so the interface gains no obligation
+ * and a second provider has nothing extra to implement.
+ */
+export async function routeLeg(
+  provider: RoutingProvider,
+  from: LatLon,
+  to: LatLon,
+  mode: TransportMode,
+): Promise<PreviewedLeg> {
+  const result = await provider.snap([from, to], mode);
+  const leg = result.legs[0];
+
+  // An adapter that returns no leg at all is treated as an unmatched leg, not
+  // an error. The user gets a straight line and is told, which is the same
+  // outcome Requirement 3.6 specifies for a leg with no road path.
+  if (leg === undefined || leg.shape.length < 2) {
+    return {
+      matched: false,
+      shape: [
+        { lat: from.lat, lon: from.lon },
+        { lat: to.lat, lon: to.lon },
+      ],
+      distanceM: null,
+    };
+  }
+
+  return {
+    matched: leg.matched,
+    shape: leg.shape.map((p) => ({ lat: p.lat, lon: p.lon })),
+    distanceM: leg.distanceM,
+  };
+}
+
+export interface CreateSnappedInput {
+  tripId: string;
+  name: string;
+  colour: string | null;
+  /** The points the user clicked. */
+  controlPoints: readonly LatLon[];
+  /** The previewed legs, one fewer than the control points. */
+  legs: readonly PreviewedLeg[];
+  mode: TransportMode;
+  provider: string;
+}
+
+/**
+ * Saves a route built with the interactive tool.
+ *
+ * Writes the **previewed** geometry rather than re-routing, for the reason
+ * given on `PreviewedLeg`: the user accepted a specific line and must get it.
+ *
+ * The inverse is a plain route deletion, exactly as for any other route
+ * creation, which is why this is undoable where a whole-route snap of a large
+ * existing route is not — there is no previous geometry to carry, only a row to
+ * remove.
+ */
+export function createSnappedRoute(
+  db: Db,
+  input: CreateSnappedInput,
+): Mutation<Route> {
+  if (input.controlPoints.length < 2) {
+    throw new ServiceError(
+      'INVALID_REQUEST',
+      'A snapped route needs at least two points.',
+    );
+  }
+
+  if (input.legs.length !== input.controlPoints.length - 1) {
+    /*
+     * A mismatch means the renderer's preview and its control points had drifted
+     * apart, so neither is trustworthy. Refusing is the only safe answer:
+     * writing the legs anyway would store a route whose control points do not
+     * describe it, and a later re-snap would silently produce a different line.
+     */
+    throw new ServiceError(
+      'INVALID_REQUEST',
+      'That route could not be saved because its legs and points did not match. Nothing was written.',
+      `${input.legs.length} legs for ${input.controlPoints.length} control points`,
+    );
+  }
+
+  const shape = flattenLegs(input.legs);
+
+  if (shape.length < 2) {
+    throw new ServiceError(
+      'INVALID_REQUEST',
+      'That route has no usable geometry to save.',
+    );
+  }
+
+  /*
+   * Bounded by the undo limit, not the higher snapped-route limit.
+   *
+   * A route built click by click is undoable by construction, and keeping it
+   * under `MAX_UNDOABLE_POINTS` means it also satisfies `routePointsSchema`, so
+   * every later edit through `route:setGeometry` keeps working. Letting the tool
+   * produce 25,000 points would create routes this application can store but
+   * not subsequently edit, which is a worse outcome than refusing the last leg.
+   */
+  if (shape.length > MAX_UNDOABLE_POINTS) {
+    throw new ServiceError(
+      'INVALID_REQUEST',
+      `This route has reached ${shape.length.toLocaleString()} points, past the ${MAX_UNDOABLE_POINTS.toLocaleString()} TrailRT can keep editable. Finish it here and start another route, or remove the last leg.`,
+    );
+  }
+
+  const unmatchedLegs: [number, number][] = [];
+  for (const [index, leg] of input.legs.entries()) {
+    if (!leg.matched) unmatchedLegs.push([index, index + 1]);
+  }
+
+  const created = db.transaction((): Route => {
+    const now = Date.now();
+    const mutation = routeService.create(db, {
+      tripId: input.tripId,
+      name: input.name,
+      colour: input.colour,
+      points: toRoutePoints(shape),
+    });
+
+    controlRepo.replaceControlPoints(
+      db,
+      mutation.result.id,
+      input.controlPoints,
+    );
+    repo.writeRoutingProvenance(db, mutation.result.id, {
+      routingProvider: input.provider,
+      transportMode: input.mode,
+      snappedAt: now,
+    });
+    repo.writeMetadata(db, mutation.result.id, { unmatchedLegs });
+
+    return mutation.result;
+  });
+
+  return {
+    result: created,
+    // Deleting the route takes its control points and provenance with it: both
+    // tables cascade on `route_id`, so there is nothing left behind to clean up
+    // and no second inverse to get wrong.
+    inverse: { kind: 'route:delete', payload: { id: created.id } },
   };
 }

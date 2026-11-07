@@ -19,6 +19,14 @@ clean typecheck and no lint errors.
 
 ### What road routing is, and is not
 
+There are two ways to get a road-following route. The **snap routing tool** in
+the map toolbar routes as you go: each click is a control point and the road
+geometry between it and the last one appears immediately, so you build the route
+and watch it follow the roads. Alternatively, draw a straight-line route and
+press **Snap to roads** in its properties to convert it in one step. Either way
+your clicks are kept as control points, so the route can be re-snapped later in
+a different transport mode without redrawing it.
+
 Snap-to-road, road classes and posted speed limits need an external routing
 service, and **none is configured by default**. With no endpoint set, TrailRT
 makes no network requests beyond map tiles, routes stay as the straight lines
@@ -26,13 +34,49 @@ you draw, and nothing in the UI claims otherwise. Point it at a Valhalla
 instance — your own or one you are permitted to use — and the features become
 available after you accept a consent prompt that names the host.
 
+### Testing snap-to-road
+
+The quickest way to see it work, with nothing to install:
+
+1. Open **Settings → Road routing**.
+2. Set the routing endpoint to `https://valhalla1.openstreetmap.de`.
+   **Note the `1`.** The address without it is the demo _website_, not the API,
+   and it answers with an HTTP 405 — which is the single most likely reason a
+   correctly configured client looks broken.
+3. Press **Test connection**. It routes two fixed sample points in Switzerland
+   and reports the round trip. It sends none of your routes, so you can check a
+   host before trusting it with them.
+4. Tick the consent box, which names the host and lists what is and is not
+   transmitted.
+5. Select a trip, then either press the snap routing tool in the map toolbar and
+   click along a road, or draw a straight-line route and press **Snap to roads**
+   in its properties.
+
+That public instance is run by FOSSGIS and is rate-limited to roughly one
+request a second. TrailRT spaces out calls to any non-loopback host to stay
+inside that, so a multi-leg snap is deliberately unhurried. It is fine for
+trying the feature out and **not** appropriate for routine use.
+
+For real use, self-host. The upstream
+[Valhalla Docker image](https://github.com/valhalla/valhalla/blob/master/docker/README.md)
+builds a routing graph from an OpenStreetMap extract of your region and serves
+it on port 8002, so the endpoint becomes `http://localhost:8002` — which the
+origin policy permits over plain http precisely because it never leaves your
+machine, and which is exempt from the call spacing above.
+
+To verify the adapter itself against a live instance:
+
+```sh
+npm run verify:valhalla     # defaults to the public demo instance
+```
+
 Two limits stated plainly:
 
-- The Valhalla adapter is written against the **published Valhalla API
-  reference** and tested against synthetic fixtures derived from it. It has
-  **not** been exercised against a live Valhalla deployment. The mapping is
-  evidence-based but unproven, and the app says so in Settings rather than
-  implying otherwise.
+- The Valhalla adapter is verified against the published API reference, against
+  a loopback server for the error paths, and — via `npm run verify:valhalla` —
+  against a real Valhalla instance. What is **not** verified is _your_
+  endpoint; that is what Test connection is for, and Settings says so until you
+  have run it.
 - Posted speed limits come from OpenStreetMap, where `maxspeed` coverage is
   partial. Distance with no known limit is reported as a sized **Unknown** band
   and is never redistributed across the known bands or inferred from road
@@ -84,7 +128,8 @@ good set rather than an aspiration.
    an import report that never silently discards data
 4. **Advanced mapping** — _complete._ OpenTopoMap and user-supplied tile
    sources, overlays, a provider-agnostic routing abstraction with a Valhalla
-   adapter, snap-to-road that keeps your points as control points, a combined
+   adapter, an interactive snap routing tool plus one-step snapping of an
+   existing route, both keeping your points as control points, a combined
    elevation / speed / road-class profile, distance-weighted speed
    distribution, scale bar, cursor coordinates, layer visibility, keyboard
    panning, a measure tool and the Waze hand-off

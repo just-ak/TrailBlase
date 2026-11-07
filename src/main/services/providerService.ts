@@ -6,6 +6,7 @@ import {
   type TransportMode,
 } from '@shared/routing/RoutingProvider';
 import type {
+  ConnectionTest,
   ConsentNotice,
   RoutingStatus,
 } from '@shared/routing/results';
@@ -41,7 +42,11 @@ import * as settingsService from './settingsService';
  * which of three quite different things to do about it.
  */
 
-export type { ConsentNotice, RoutingStatus } from '@shared/routing/results';
+export type {
+  ConnectionTest,
+  ConsentNotice,
+  RoutingStatus,
+} from '@shared/routing/results';
 
 export type RoutingResolution =
   | { available: true; provider: RoutingProvider; status: RoutingStatus }
@@ -87,9 +92,19 @@ function statusFor(
     message,
     attribution,
     mode: settings.transportMode,
-    verifiedAgainstLiveInstance: false,
+    /*
+     * Set by a successful `testConnection` against this exact origin.
+     *
+     * Kept in memory rather than persisted: whether a host is reachable is a
+     * property of right now, and a stored "tested" flag would still claim
+     * success for a server that has since been switched off.
+     */
+    endpointTested: origin !== null && testedOrigins.has(origin),
   };
 }
+
+/** Origins that have answered a test route since launch. Not persisted. */
+const testedOrigins = new Set<string>();
 
 /**
  * Resolves from an already-loaded settings object.
@@ -153,6 +168,109 @@ export function resolveFrom(settings: AppSettings): RoutingResolution {
 
 export function resolve(db: Db): RoutingResolution {
   return resolveFrom(settingsService.all(db));
+}
+
+/**
+ * Two points on a road with good OpenStreetMap coverage, near Interlaken.
+ *
+ * Constants, not the user's geometry — that is what makes the test runnable
+ * before consent is given. About 1.8 km apart on a classified road, so a
+ * working service returns a substantial shape and a broken one is obvious.
+ */
+const TEST_FROM = { lat: 46.6863, lon: 7.8632 };
+const TEST_TO = { lat: 46.6925, lon: 7.885 };
+
+/**
+ * Tests an endpoint by actually routing between two fixed sample points.
+ *
+ * ## Why this does not go through the consent gate
+ *
+ * Consent exists so the user's own coordinates are never transmitted without
+ * agreement. This call transmits two hard-coded coordinates in Switzerland and
+ * nothing else, so there is nothing of the user's to protect — and the test is
+ * most useful *before* consenting, because it is how you find out whether an
+ * endpoint is worth trusting your routes to. Requiring consent first would
+ * force the user to agree to send their routes to a host they have no way to
+ * verify, which is backwards.
+ *
+ * It is still only ever reached by an explicit press of a button that says what
+ * it will do. Nothing calls it on a timer or on dialog open.
+ *
+ * The endpoint is taken as an argument rather than read from settings, so an
+ * address can be checked before it is saved.
+ */
+export async function testConnection(
+  endpoint: string,
+  mode: TransportMode = DEFAULT_TRANSPORT_MODE,
+): Promise<ConnectionTest> {
+  const check = checkRoutingOrigin(endpoint);
+
+  if (!check.ok || check.origin === null) {
+    return {
+      ok: false,
+      origin: null,
+      elapsedMs: null,
+      pointCount: null,
+      message: check.message ?? 'That address cannot be used.',
+    };
+  }
+
+  const started = Date.now();
+
+  try {
+    const provider = createValhallaProvider({
+      endpoint: endpoint.trim(),
+      // Shorter than the default: a test that hangs for twenty seconds is a
+      // worse answer than one that gives up and says so.
+      timeoutMs: 10_000,
+    });
+
+    const result = await provider.snap([TEST_FROM, TEST_TO], mode);
+    const elapsedMs = Date.now() - started;
+    const leg = result.legs[0];
+    const pointCount = leg?.shape.length ?? 0;
+
+    /*
+     * A leg that came back unmatched means the service answered but could not
+     * route a short stretch of classified road. That is not a working routing
+     * service for our purposes — most likely the graph covers a different
+     * region — so it is reported as a failure with that explanation rather
+     * than as a pass.
+     */
+    if (leg === undefined || !leg.matched || pointCount < 2) {
+      return {
+        ok: false,
+        origin: check.origin,
+        elapsedMs,
+        pointCount,
+        message: `${check.origin} answered, but could not route between two points on a main road in Switzerland. If this is your own instance, its map data probably covers a different region.`,
+      };
+    }
+
+    // Reaching here means the host routed real geometry, which is the only
+    // evidence worth recording.
+
+    testedOrigins.add(check.origin);
+
+    return {
+      ok: true,
+      origin: check.origin,
+      elapsedMs,
+      pointCount,
+      message: `Connected. ${check.origin} routed a 1.8 km sample to ${pointCount} road points in ${elapsedMs} ms.`,
+    };
+  } catch (cause) {
+    return {
+      ok: false,
+      origin: check.origin,
+      elapsedMs: Date.now() - started,
+      pointCount: null,
+      message:
+        cause instanceof ServiceError
+          ? cause.message
+          : 'The routing service could not be reached.',
+    };
+  }
 }
 
 export function status(db: Db): RoutingStatus {

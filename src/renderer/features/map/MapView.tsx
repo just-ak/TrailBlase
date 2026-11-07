@@ -25,6 +25,11 @@ import { useSelectionStore } from "../../stores/selectionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useRoutingStore } from "../../stores/routingStore";
+import {
+  snapPointCount,
+  snapRoutedDistanceM,
+  useSnapRoutingStore,
+} from "../../stores/snapRoutingStore";
 import { getMapInstance, useMapInstance } from "./mapInstance";
 import { MapReadout } from "./MapReadout";
 import { useDrawMode } from "./useDrawMode";
@@ -32,6 +37,7 @@ import { useLeafletMap } from "./useLeafletMap";
 import { useMeasureTool, measureStateFrom } from "./useMeasureTool";
 import { useRouteLayers } from "./useRouteLayers";
 import { useSnapOverlay } from "./useSnapOverlay";
+import { useSnapRouting } from "./useSnapRouting";
 import { useTrackLayers } from "./useTrackLayers";
 import { useWaypointLayers } from "./useWaypointLayers";
 
@@ -85,6 +91,11 @@ export function MapView(): ReactNode {
 
   const routingStatus = useRoutingStore((s) => s.status);
   const routeProvenance = useRoutingStore((s) => s.provenance);
+
+  const snapControlPoints = useSnapRoutingStore((s) => s.controlPoints);
+  const snapLegs = useSnapRoutingStore((s) => s.legs);
+  const snapRouting = useSnapRoutingStore((s) => s.routing);
+  const snapError = useSnapRoutingStore((s) => s.error);
 
   const [layerMenuOpen, setLayerMenuOpen] = useState(false);
   /** Per-point dots on the selected track. Off by default: see useTrackLayers. */
@@ -288,6 +299,21 @@ export function MapView(): ReactNode {
     onUndoLast: () => useEditorStore.getState().undoLastPending(),
   });
 
+  // --- interactive snap routing: a control point per click, roads in between
+  useSnapRouting(map, {
+    active: mode === "snapRoute",
+    controlPoints: snapControlPoints,
+    legs: snapLegs,
+    routing: snapRouting,
+    onAppend: (point) => actions.appendSnapPoint(point),
+    onUndoLast: () => actions.undoLastSnapPoint(),
+    onFinish: () => void actions.finishSnapRouting(),
+    onCancel: () => {
+      actions.cancelSnapRouting();
+      showToast("Snap routing cancelled — nothing was saved.");
+    },
+  });
+
   // --- measure tool: creates nothing, so it has no undo entry
   useMeasureTool(map, {
     active: mode === "measure",
@@ -306,6 +332,18 @@ export function MapView(): ReactNode {
     map,
     selected?.kind === "route" ? (routeProvenance[selected.id] ?? null) : null,
   );
+
+  /*
+   * Routing availability, read once on mount.
+   *
+   * A local database read, so it costs nothing and cannot reach the network.
+   * The toolbar needs it to decide whether the snap tool is usable, and a
+   * disabled button with a reason beats one that accepts a click and then
+   * explains itself.
+   */
+  useEffect(() => {
+    void useRoutingStore.getState().loadStatus();
+  }, []);
 
   /*
    * Snap provenance for the selected route.
@@ -592,6 +630,21 @@ export function MapView(): ReactNode {
               </span>
             ))}
 
+          {mode === "snapRoute" && (
+            <span className="pointer-events-none">
+              Click to extend along the roads · <strong>Enter</strong> or
+              double-click to finish · <strong>Backspace</strong> removes the
+              last · <strong>Esc</strong> cancels
+              {snapControlPoints.length > 0 && (
+                <>
+                  {" · "}
+                  {snapControlPoints.length} point
+                  {snapControlPoints.length === 1 ? "" : "s"}
+                </>
+              )}
+            </span>
+          )}
+
           {mode === "placeWaypoint" && (
             <span className="pointer-events-none">
               Click the map to place a waypoint · <strong>Esc</strong> cancels
@@ -615,6 +668,44 @@ export function MapView(): ReactNode {
         The running total, kept separate from the hint bar so the numbers do not
         move as the hint text reflows.
       */}
+      {/*
+        Live totals for the snap tool, in their own bar so the figures do not
+        shift as the hint text reflows. The routing/failed states are reported
+        here because a leg in flight and a leg that failed look the same on the
+        map otherwise, and the user's next move depends on which it is.
+      */}
+      {mode === "snapRoute" && snapControlPoints.length > 0 && (
+        <div
+          role="status"
+          className="pointer-events-none absolute top-16 left-1/2 z-[600] -translate-x-1/2 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-3 py-1.5 text-[12px] text-[var(--color-text-primary)] shadow-md"
+        >
+          <strong>
+            {formatDistance(snapRoutedDistanceM(snapLegs), settings.units)}
+          </strong>{" "}
+          along roads
+          <span className="ml-2 text-[var(--color-text-secondary)]">
+            {snapLegs.length} of {snapControlPoints.length - 1} leg
+            {snapControlPoints.length === 2 ? "" : "s"} routed ·{" "}
+            {snapPointCount(snapLegs).toLocaleString()} points
+          </span>
+          {snapRouting && (
+            <span className="ml-2 text-[var(--color-text-muted)]">
+              routing…
+            </span>
+          )}
+          {snapError !== null && (
+            <span className="ml-2 text-[var(--color-danger)]">
+              last leg failed — {snapError}
+            </span>
+          )}
+          {snapLegs.some((leg) => !leg.matched) && (
+            <span className="ml-2 text-[var(--color-danger)]">
+              {snapLegs.filter((leg) => !leg.matched).length} straight
+            </span>
+          )}
+        </div>
+      )}
+
       {mode === "measure" && measurePoints.length > 0 && (
         <div
           role="status"
@@ -674,6 +765,50 @@ export function MapView(): ReactNode {
             −
           </button>
         </div>
+
+        {/*
+          The snap routing tool.
+ 
+          Disabled rather than hidden when no provider is available, with the
+          reason in the tooltip. A tool that appears and disappears is harder to
+          understand than one that explains why it cannot run — and unlike the
+          in-draw snap toggle, which would be noise in the hint bar, a toolbar
+          slot that stays put is the thing a user goes looking for.
+        */}
+        <button
+          type="button"
+          aria-label="Snap routing"
+          aria-pressed={mode === "snapRoute"}
+          disabled={routingStatus !== null && !routingStatus.available}
+          title={
+            routingStatus === null || routingStatus.available
+              ? "Click points and follow the roads between them"
+              : (routingStatus.message ??
+                "Snap routing needs a routing service, configured in Settings.")
+          }
+          onClick={() => {
+            if (mode === "snapRoute") actions.cancelSnapRouting();
+            else void actions.startSnapRouting();
+          }}
+          className={`flex h-8 w-8 items-center justify-center rounded-md border text-[13px] shadow-md disabled:cursor-not-allowed disabled:opacity-45 ${
+            mode === "snapRoute"
+              ? "border-[var(--color-accent)] bg-[var(--color-surface)] text-[var(--color-accent)]"
+              : "border-[var(--color-border-subtle)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-sunken)]"
+          }`}
+        >
+          {/* A bending road between two pins. */}
+          <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              d="M5 17c0-4 9-3 9-7s-5-3-5-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+            <circle cx="5" cy="17" r="1.8" fill="currentColor" />
+            <circle cx="9" cy="4" r="1.8" fill="currentColor" />
+          </svg>
+        </button>
 
         <button
           type="button"

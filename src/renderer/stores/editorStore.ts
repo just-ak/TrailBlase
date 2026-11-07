@@ -10,7 +10,17 @@ import type { LatLon } from '@shared/geo/distance';
  * 1.4). The measure tool goes further and never writes at all.
  */
 
-export type EditorMode = 'idle' | 'drawRoute' | 'placeWaypoint' | 'measure';
+export type EditorMode =
+  | 'idle'
+  | 'drawRoute'
+  | 'placeWaypoint'
+  | 'measure'
+  /**
+   * The interactive snap routing tool. Its geometry lives in
+   * `snapRoutingStore`, because unlike every other mode it is filled in
+   * asynchronously by a provider and needs ordering and staleness handling.
+   */
+  | 'snapRoute';
 
 interface EditorState {
   mode: EditorMode;
@@ -32,6 +42,7 @@ interface EditorState {
   startDrawRoute(tripId: string): void;
   startPlaceWaypoint(tripId: string): void;
   startMeasure(): void;
+  startSnapRoute(tripId: string): void;
   setSnapWhileDrawing(snap: boolean): void;
   appendPending(point: RoutePoint): void;
   undoLastPending(): void;
@@ -63,6 +74,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // No trip id: a measurement belongs to nothing.
   startMeasure: () =>
     set({ mode: 'measure', measurePoints: [], targetTripId: null }),
+
+  startSnapRoute: (tripId) =>
+    set({ mode: 'snapRoute', pending: [], targetTripId: tripId }),
 
   setSnapWhileDrawing: (snapWhileDrawing) => set({ snapWhileDrawing }),
 

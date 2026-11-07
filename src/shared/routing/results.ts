@@ -33,11 +33,16 @@ export interface RoutingStatus {
   attribution: string | null;
   mode: TransportMode;
   /**
-   * Shown in the UI. The Valhalla adapter is written against the published API
-   * reference and synthetic fixtures, not a live deployment, and claiming
-   * otherwise would overstate what has been proven.
+   * Whether **this endpoint** has answered a test route in this session.
+   *
+   * Replaced a field that claimed the *adapter* had never met a live Valhalla.
+   * That was true when it was written and is no longer: the adapter is now
+   * verified against a real instance by `valhalla.live.test.ts`. The useful
+   * remaining question is about the user's own host, which no amount of
+   * adapter testing can answer — hence the Test connection button, which is
+   * what sets this.
    */
-  verifiedAgainstLiveInstance: boolean;
+  endpointTested: boolean;
 }
 
 /** What the consent prompt says, built around the host actually configured. */
@@ -79,6 +84,45 @@ export interface RouteProvenance {
    * behaving exactly as it did.
    */
   controlPoints: { lat: number; lon: number }[];
+}
+
+/**
+ * One routed leg, as previewed by the interactive snap routing tool.
+ *
+ * A trimmed `RouteLeg`: the control indices are implied by position in the
+ * array, and `durationS` is dropped because nothing displays it and sending a
+ * provider's travel-time estimate to the renderer invites someone treating it
+ * as a measurement.
+ *
+ * These cross back to the main process on finish, so that what is saved is
+ * exactly the geometry the user watched appear. Re-routing on save would be a
+ * second set of provider calls that could legitimately return something else —
+ * traffic-free vs not, a graph updated in between — and the route would quietly
+ * differ from the one they accepted.
+ */
+export interface PreviewedLeg {
+  /** False when the provider found no road path; `shape` is then the straight line. */
+  matched: boolean;
+  shape: { lat: number; lon: number }[];
+  /** Metres, as reported by the provider. Null when it did not say. */
+  distanceM: number | null;
+}
+
+/**
+ * The result of testing a routing endpoint.
+ *
+ * `pointCount` is the interesting field: a service can answer 200 and still
+ * not be a routing service, so the test is only passed if real road geometry
+ * came back. "It responded" is not the question.
+ */
+export interface ConnectionTest {
+  ok: boolean;
+  origin: string | null;
+  /** Round trip in milliseconds, including any politeness delay. */
+  elapsedMs: number | null;
+  /** Road vertices returned for the sample leg. Null on failure. */
+  pointCount: number | null;
+  message: string;
 }
 
 export interface AttributeStatus {

@@ -16,6 +16,70 @@ import { checkRoutingOrigin } from '@shared/net/origin';
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 /**
+ * Identifies the application to the routing service.
+ *
+ * The OpenStreetMap-adjacent fair-use policies that cover the public Valhalla
+ * instance ask for a descriptive User-Agent, the same obligation
+ * `MapProvider` records for tiles. Electron's default UA claims to be Chrome,
+ * which tells an operator nothing about who is actually calling and makes a
+ * misbehaving client impossible to identify. Sent for self-hosted instances
+ * too: an operator reading their own logs benefits equally.
+ */
+const USER_AGENT = 'TrailRT/0.1.0 (+https://github.com/trailrt/trailrt)';
+
+/**
+ * Minimum spacing between calls to a **remote** routing service.
+ *
+ * The public Valhalla instance is rate-limited to roughly one call per second
+ * per user, and a whole-route snap issues one call per leg as fast as the
+ * server answers them. Without spacing, snapping a twenty-point route is an
+ * instant burst that earns a 429 and makes the feature look broken while also
+ * being rude to a volunteer-funded server.
+ *
+ * Loopback is exempt. A service on the user's own machine has no fair-use
+ * policy to respect, and making a self-hosted snap twenty times slower to
+ * protect a server that does not need protecting would be the wrong trade. This
+ * is the same loopback distinction the origin policy already draws.
+ */
+const REMOTE_MIN_INTERVAL_MS = 1100;
+
+let lastRemoteCallAt = 0;
+
+function isLoopbackOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname.toLowerCase();
+    return (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host === '::1' ||
+      host === '[::1]' ||
+      /^127(?:\.\d{1,3}){3}$/.test(host)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Waits out the remaining spacing before a remote call.
+ *
+ * Serialised against a module-level timestamp rather than a queue, because
+ * every caller in the application already awaits its own request — the snap
+ * drain loop and the whole-route snap are both strictly sequential — so there
+ * is never more than one call in flight to interleave.
+ */
+async function throttleRemote(origin: string): Promise<void> {
+  if (isLoopbackOrigin(origin)) return;
+
+  const now = Date.now();
+  const wait = lastRemoteCallAt + REMOTE_MIN_INTERVAL_MS - now;
+  lastRemoteCallAt = wait > 0 ? now + wait : now;
+  if (wait > 0) {
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+}
+
+/**
  * Response ceiling.
  *
  * A `trace_attributes` response for a long trace is genuinely large, but it is
@@ -63,6 +127,10 @@ export async function postJson<T>(
   const url = joinUrl(options.endpoint, options.path);
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
+  // Before the timer starts, so waiting out the rate limit is not counted
+  // against the request's own deadline.
+  await throttleRemote(check.origin ?? options.endpoint);
+
   // Two independent reasons to abort — the deadline and the user cancelling —
   // combined so the fetch only needs one signal.
   const controller = new AbortController();
@@ -76,6 +144,7 @@ export async function postJson<T>(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        'User-Agent': USER_AGENT,
       },
       body: JSON.stringify(options.body),
       signal: controller.signal,
@@ -86,8 +155,23 @@ export async function postJson<T>(
     });
 
     if (!response.ok) {
+      /*
+       * `PROVIDER_ERROR` means "the service answered and declined this
+       * request", and the adapter treats that as an unroutable leg. A status
+       * that says nothing about the request itself must not be classified that
+       * way, or a misconfigured host and a rate limit both end up drawn as
+       * straight lines across the map with no explanation.
+       *
+       * 429 is transient and affects every following call. 404 and 405 mean
+       * the address is wrong, not the route. Both are the user's to fix.
+       */
+      const transportLevel =
+        response.status === 429 ||
+        response.status === 404 ||
+        response.status === 405;
+
       throw new ServiceError(
-        'PROVIDER_ERROR',
+        transportLevel ? 'PROVIDER_UNAVAILABLE' : 'PROVIDER_ERROR',
         describeStatus(response.status),
         `${response.status} ${response.statusText} from ${url}`,
       );
@@ -193,6 +277,9 @@ function describeStatus(status: number): string {
   }
   if (status === 429) {
     return 'The routing service is rate-limiting requests. Wait a moment before trying again.';
+  }
+  if (status === 405) {
+    return 'The routing service refused a POST to that address. On the public Valhalla demo this means the host is the demo website rather than its API — try valhalla1.openstreetmap.de.';
   }
   if (status >= 500) {
     return 'The routing service reported an internal error.';

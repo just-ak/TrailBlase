@@ -5,7 +5,7 @@ import {
   TRANSPORT_MODES,
   type TransportMode,
 } from "@shared/routing/RoutingProvider";
-import type { ConsentNotice } from "@shared/routing/results";
+import type { ConnectionTest, ConsentNotice } from "@shared/routing/results";
 import type { ThemePreference, UnitSystem } from "@shared/domain/types";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
@@ -286,6 +286,8 @@ function RoutingSettings(): ReactNode {
    */
   const [edit, setEdit] = useState<string | null>(null);
   const [notice, setNotice] = useState<ConsentNotice | null>(null);
+  const [test, setTest] = useState<ConnectionTest | null>(null);
+  const [testing, setTesting] = useState(false);
   const draft = edit ?? settings.routingEndpoint;
 
   useEffect(() => {
@@ -329,10 +331,39 @@ function RoutingSettings(): ReactNode {
     await loadStatus();
   };
 
+  /**
+   * Tests the address in the field, saved or not.
+   *
+   * Uses `draft` rather than the stored value so a pasted endpoint can be
+   * checked before committing it — which is the order a careful user works in.
+   */
+  const runTest = async (): Promise<void> => {
+    setTesting(true);
+    try {
+      const result = await callOr(
+        api().routing.test({ endpoint: draft.trim() }),
+        null,
+      );
+      setTest(
+        result ?? {
+          ok: false,
+          origin: null,
+          elapsedMs: null,
+          pointCount: null,
+          message: "The test could not be run.",
+        },
+      );
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const commit = (): void => {
     if (edit === null) return;
     const value = draft.trim();
     setEdit(null);
+    // A result for the previous address would be misleading next to a new one.
+    setTest(null);
     if (value === settings.routingEndpoint) return;
     // Refused locally rather than sent and rejected: the schema would reject it
     // too, and a round trip to be told the same thing is just slower.
@@ -367,6 +398,13 @@ function RoutingSettings(): ReactNode {
           permitted to use. <strong>https</strong> anywhere; plain{" "}
           <strong>http</strong> only for a service on this machine.
         </p>
+        <p className={`${hintClass} mb-1`}>
+          To try it without running anything, use the public demo instance{" "}
+          <code>https://valhalla1.openstreetmap.de</code>. Note the{" "}
+          <strong>1</strong>: the address without it is the demo website, not
+          the API, and returns an error. The demo is rate-limited to about one
+          request a second and is not for routine use — self-host for that.
+        </p>
         <input
           type="text"
           aria-label="Routing endpoint"
@@ -397,6 +435,39 @@ function RoutingSettings(): ReactNode {
           <p className={`${hintClass} mt-1`}>
             Requests would go to <code>{check.origin}</code>, and that is the
             only outbound host the app is allowed to contact.
+          </p>
+        )}
+
+        <div className="mt-2 flex items-start gap-2">
+          <Button
+            disabled={draftEmpty || draftInvalid || testing}
+            onClick={() => void runTest()}
+            title="Routes between two fixed sample points in Switzerland. Sends none of your routes."
+          >
+            {testing ? "Testing…" : "Test connection"}
+          </Button>
+          {/*
+            Spelled out next to the button, because a control that makes a
+            network request has to say what it sends before it is pressed, not
+            after. This is the one routing call not gated on consent, and that
+            is only defensible while it genuinely carries nothing of the user's.
+          */}
+          <p className={`${hintClass} flex-1`}>
+            Routes two fixed sample points to check the address. Sends none of
+            your routes, so you can check a host before trusting it with them.
+          </p>
+        </div>
+
+        {test !== null && (
+          <p
+            role="status"
+            className={`mt-1 text-[11px] ${
+              test.ok
+                ? "text-[var(--color-text-secondary)]"
+                : "text-[var(--color-danger)]"
+            }`}
+          >
+            {test.message}
           </p>
         )}
       </div>
@@ -473,12 +544,11 @@ function RoutingSettings(): ReactNode {
           {status.available
             ? `Ready. ${status.attribution ?? ""}`
             : (status.message ?? "")}
-          {status.available && !status.verifiedAgainstLiveInstance && (
+          {status.available && !status.endpointTested && (
             <>
               {" "}
-              The Valhalla adapter is written against the published API
-              reference and tested against synthetic fixtures, not against a
-              live instance. If a response looks wrong, that is why.
+              This address has not been tested yet in this session. Press Test
+              connection to confirm it actually routes.
             </>
           )}
         </p>

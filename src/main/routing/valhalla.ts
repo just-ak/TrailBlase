@@ -28,12 +28,26 @@ import { decodeValhallaShape, encodePolyline, VALHALLA_PRECISION } from './polyl
  * conversion here would be a 3.6× error that looks plausible on a speed and
  * catastrophic on a distance.
  *
- * ## Verification status, stated honestly
+ * ## Verification status
  *
- * This adapter is written against the published Valhalla API reference and is
- * tested against synthetic fixtures derived from it. It has **not** been
- * exercised against a live Valhalla deployment. The mapping is evidence-based
- * but unproven, and the UI says so rather than implying otherwise.
+ * Tested three ways. `valhalla.test.ts` drives a loopback `node:http` server
+ * for the error paths — timeout, 500, malformed JSON — that a real service will
+ * not produce on demand. `polyline.test.ts` reproduces the documented
+ * polyline vector. And `valhalla.live.test.ts` runs the real thing against a
+ * real instance, confirming that `length` arrives in kilometres, `speed_limit`
+ * in km/h, the shape is polyline6, and the road classes and surfaces survive
+ * the guards:
+ *
+ *   npm run verify:valhalla
+ *
+ * The live test is opt-in so the default suite needs no network. It is what
+ * retired the earlier caveat in this comment, which said the adapter had never
+ * met a real deployment.
+ *
+ * One thing that caveat would not have caught, and which cost real time: the
+ * public instance's API host is `valhalla1.openstreetmap.de`. Drop the `1` and
+ * you reach the demo *website*, whose nginx answers POST with 405 — a correct
+ * client looks broken and the error points nowhere useful.
  */
 
 const KM_TO_M = 1000;
@@ -212,9 +226,22 @@ export function createValhallaProvider(
             durationS: finite(leg?.summary?.time),
           });
         } catch (cause) {
-          // A cancellation is the user's decision and must stop the whole
-          // operation; an unroutable leg is a local fact about one stretch.
-          if (cause instanceof ServiceError && cause.code === 'CANCELLED') {
+          /*
+           * Only a *routing* failure becomes a straight line.
+           *
+           * The distinction matters more than it looks. "No road path between
+           * these two points" is a local fact about one stretch, and falling
+           * back to a straight line is what Requirement 3.6 asks for. "The
+           * service is unreachable" is not a fact about the road at all, and
+           * swallowing it would report every leg of a twenty-point route as
+           * unmatched — twenty straight lines and no hint that the server was
+           * down. The user would go looking for a gap in the map data.
+           *
+           * So transport-level failures propagate: unreachable, timed out,
+           * rate-limited, cancelled. Each of those will affect the next leg
+           * identically, which is the test for whether continuing makes sense.
+           */
+          if (cause instanceof ServiceError && cause.code !== 'PROVIDER_ERROR') {
             throw cause;
           }
           legs.push(straightLeg(from, to, i));
